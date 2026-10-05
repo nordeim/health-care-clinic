@@ -15,6 +15,8 @@ import { HeartPulse } from "lucide-react";
 
 type Status = "idle" | "sending" | "error";
 
+type FieldErrors = Partial<Record<"email" | "password", string>>;
+
 const inputClassName =
   "rounded-none border-0 border-b border-primary/40 bg-transparent px-0 py-4 outline-none transition-colors focus:border-primary focus:ring-0";
 
@@ -22,6 +24,7 @@ export function LoginForm() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,6 +33,7 @@ export function LoginForm() {
 
     setStatus("sending");
     setErrorMessage(null);
+    setFieldErrors(null);
 
     try {
       const response = await fetch("/api/auth/login", {
@@ -43,8 +47,11 @@ export function LoginForm() {
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as
-          | { error?: string }
+          | { error?: string; fields?: FieldErrors }
           | null;
+        if (response.status === 422 && body?.fields) {
+          setFieldErrors(body.fields);
+        }
         throw new Error(body?.error ?? `Sign-in failed (${response.status}).`);
       }
 
@@ -82,7 +89,6 @@ export function LoginForm() {
       <form
         onSubmit={onSubmit}
         className="grid gap-6 rounded-[24px] bg-card p-8 shadow-sm"
-        noValidate
       >
         <label className="grid gap-2 text-sm font-medium text-primary">
           Email
@@ -91,8 +97,15 @@ export function LoginForm() {
             name="email"
             autoComplete="email"
             required
+            aria-invalid={fieldErrors?.email ? true : undefined}
+            aria-describedby={fieldErrors?.email ? "login-email-error" : undefined}
             className={inputClassName}
           />
+          {fieldErrors?.email ? (
+            <span id="login-email-error" className="text-sm font-normal text-destructive">
+              {fieldErrors.email}
+            </span>
+          ) : null}
         </label>
 
         <label className="grid gap-2 text-sm font-medium text-primary">
@@ -102,8 +115,15 @@ export function LoginForm() {
             name="password"
             autoComplete="current-password"
             required
+            aria-invalid={fieldErrors?.password ? true : undefined}
+            aria-describedby={fieldErrors?.password ? "login-password-error" : undefined}
             className={inputClassName}
           />
+          {fieldErrors?.password ? (
+            <span id="login-password-error" className="text-sm font-normal text-destructive">
+              {fieldErrors.password}
+            </span>
+          ) : null}
         </label>
 
         {status === "error" && errorMessage ? (

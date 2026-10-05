@@ -45,6 +45,11 @@ export default defineConfig({
       HOSTNAME: "localhost",
       NODE_ENV: "production",
       DATABASE_URL: E2E_DATABASE_URL,
+      // Explicit test signing key: previously this only worked because bun
+      // auto-loads .env into process.env — `npx playwright test` (or a CI
+      // runner without .env) made every login 500 (production signing
+      // throws without AUTH_SECRET). Never inherit secrets implicitly.
+      AUTH_SECRET: process.env.AUTH_SECRET ?? "e2e-insecure-test-secret",
     } as Record<string, string>,
   },
 });

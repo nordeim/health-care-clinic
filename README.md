@@ -47,8 +47,8 @@ geometry).
 | ⚖️ Legal pages | `/privacy-policy` and `/accessibility-statement` with identical copy and layout |
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
 | 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests, server-guarded |
-| 🛡️ Abuse controls | Per-IP fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login) and strict server-side payload validation |
-| ✅ Tested | 33 unit tests + 28 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, a dependency-contract pin, and the full auth loop |
+| 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413), and strict server-side payload validation |
+| ✅ Tested | 65 unit tests + 34 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins, and the validation + timing-equalization seams |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified
@@ -171,9 +171,9 @@ The `dev` / `build` / `db:*` scripts strip any ambient `DATABASE_URL`
 
 ```bash
 bun run lint          # ESLint (flat config)
-bun run typecheck     # tsc --noEmit
-bun run test          # Vitest unit layer (db-path + auth contracts)
-bun run build         # production standalone build
+bun run typecheck     # tsc --noEmit (true strict)
+bun run test          # Vitest unit layer (db-path + auth + deps + validation + rate-limit seams)
+bun run build         # production standalone build (types enforced)
 bun run test:e2e      # Playwright — boots the standalone server + scratch DB
 ```
 
@@ -207,10 +207,10 @@ by the ported base layer — matching the reference exactly.
 | Desktop sections | [docs/screenshots/02-desktop-*.png](docs/screenshots/) |
 | Full page | [docs/screenshots/03-desktop-full.png](docs/screenshots/03-desktop-full.png) |
 | Mobile hero / menu | [docs/screenshots/04-mobile-hero.png](docs/screenshots/04-mobile-hero.png), [05-mobile-menu-open.png](docs/screenshots/05-mobile-menu-open.png) |
-| Appointment flow | [docs/screenshots/09-appointment-form.png](docs/screenshots/09-appointment-form.png), [10-appointment-success.png](docs/screenshots/10-appointment-success.png) |
+| Appointment flow | [docs/screenshots/09-appointment-form.png](docs/screenshots/09-appointment-form.png), [10-appointment-success.png](docs/screenshots/10-appointment-success.png), [14-appointment-field-errors.png](docs/screenshots/14-appointment-field-errors.png) |
 | Legal pages | [docs/screenshots/07-privacy-policy.png](docs/screenshots/07-privacy-policy.png), [08-accessibility-statement.png](docs/screenshots/08-accessibility-statement.png) |
 | Staff sign-in | [docs/screenshots/11-login-desktop.png](docs/screenshots/11-login-desktop.png) |
-| Appointment dashboard | [docs/screenshots/12-dashboard-desktop.png](docs/screenshots/12-dashboard-desktop.png), [13-dashboard-mobile.png](docs/screenshots/13-dashboard-mobile.png) |
+| Appointment dashboard | [docs/screenshots/12-dashboard-desktop.png](docs/screenshots/12-dashboard-desktop.png), [13-dashboard-mobile.png](docs/screenshots/13-dashboard-mobile.png), [15-dashboard-mobile-390-full.png](docs/screenshots/15-dashboard-mobile-390-full.png) |
 
 ## Deployment
 

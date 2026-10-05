@@ -7,10 +7,10 @@ description: >
   dependency-free staff auth/dashboard extension. Captures the
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
-  methodology, and every hard-won lesson from sessions 1, 2, 4 and 6.
-version: 2.2.0
+  methodology, and every hard-won lesson from sessions 1, 2, 4, 6 and 8.
+version: 2.3.0
 last_updated: 2026-10-05
-project_state: 33 unit tests + 28 e2e tests green; scaffold cleaned (scripts/ = seed.ts only, zero unused deps); env-leak guard active (env -u)
+project_state: 65 unit tests + 34 e2e tests green; HTTP edge hardened (timing-equalized login, last-token XFF rate limiting, 413 body cap, impossible-date rejection); env-leak guard active (env -u)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -176,6 +176,8 @@ src/components/site/         13 components: one per landing section
 src/components/dashboard/    LoginForm + LogoutButton (client islands)
 src/lib/content.ts           ALL copy, icon maps, nav contracts (as const)
 src/lib/auth.ts              scrypt + HMAC session primitives (pure)
+src/lib/validation.ts        appointment payload validation seam (pure)
+src/lib/rate-limit.ts        clientKey + fixed-window limiter + body cap (pure)
 src/lib/db.ts                Prisma singleton (globalThis in dev)
 src/lib/db-path.ts           SQLite URL resolution (pure, tested)
 scripts/seed.ts              db:seed staff upsert (the ONLY script — the
@@ -323,11 +325,12 @@ API calls surface there. API failures log structured messages
 
 ```bash
 bun run lint          # 0 errors
-bun run typecheck     # clean
-bun run test          # 33/33 (db-path 15 + auth 14 + deps 4)
+bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
+bun run test          # 65/65 (db-path 15 + auth 18 + deps 4 +
+                      #  validation 18 + rate-limit 10)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
-bun run test:e2e      # 28/28 (5 spec files)
+bun run test:e2e      # 34/34 (5 spec files)
 ```
 
 Manual smoke: mobile menu open → link click (closes + jumps) → Escape
@@ -572,3 +575,27 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   loop re-verified under an active ambient `DATABASE_URL` hijack value
   (the `env -u` guards held). Cleanup proven behavior-neutral: identical
   build route table, 28/28 e2e, 9 screenshots refreshed.
+- **Session 8** (HTTP-edge hardening): fresh-eyes audit found the risks the
+  earlier audits hadn't surfaced — a login user-enumeration TIMING oracle
+  (unknown email skipped scrypt entirely), first-token XFF rate-limit
+  keying (client-controllable), the client discarding the server's 422
+  field map ("check the highlighted fields" with nothing highlighted),
+  impossible calendar dates passing validation via JS Date rollover
+  (Feb 31 → Mar 3, persisted as garbage), reveal content lost forever on
+  client-bundle failure, the heartbeat animation missing its
+  reduced-motion guard, and a real tel: href parity deviation
+  (contact/footer `tel:1234567890` vs the reference's uniform
+  `tel:+11234567890`). Remediated via TDD with two new pure seams —
+  `src/lib/validation.ts` (calendar round-trip rejection + specialty
+  allowlist DERIVED from content.ts) and `src/lib/rate-limit.ts`
+  (last-token XFF keying + fixed-window limiter + 64 KiB body cap) — plus
+  `DUMMY_HASH`/`verifyLoginPassword` timing equalization, per-field 422
+  rendering with aria wiring, the reveal self-heal timer (inline script,
+  cancelled by the first Reveal mount), true TS strict (noImplicitAny,
+  no ignoreBuildErrors), `metadataBase` wired to NEXT_PUBLIC_SITE_URL,
+  `@types/node` declared, and an explicit playwright AUTH_SECRET. Unit
+  suite 33 → 65; e2e 28 → 34 (impossible dates, 422 UI, 429 under a
+  dedicated spoofed XFF key, 413 cap, enumeration parity, tel: pin).
+  Live parity re-verified byte-exact on both sites; product loop green
+  under the active ambient hijack; 11 screenshots refreshed (incl. the
+  NEW 14-appointment-field-errors state).

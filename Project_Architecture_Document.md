@@ -17,6 +17,7 @@
 - `[S2]` Session-2 audit + remediation (see `docs/remediation-plan-session2.md`): ADR-008..010 recorded — dependency-free cookie session auth, the staff dashboard beyond-parity extension, and the `env -u DATABASE_URL` determinism guard. `.env.example` rewritten to match the codebase; `db:seed` added; auth unit + e2e layers added (29 unit / 27 e2e total).
 - `[S4]` Session-4 re-audit (see `docs/remediation-plan-session4.md`): live parity re-verified against the reference (7490px, heading scales, mobile menu panel byte-exact); the annotated tree below brought up to date with the session-2 surfaces; the semantic-`<title>` deviation from the reference's `"Base44 APP"` platform placeholder recorded in the validation report and pinned by `toHaveTitle` e2e assertions (28 e2e); `braces`/`deepmerge-ts` advisories re-verified unfixable upstream (accepted dev-time risk); SKILL.md destructive-token typo corrected.
 - `[S6]` Session-6 scaffold cleanup (see `docs/remediation-plan-session6.md`): the pre-clone legacy removed — 14 ORBITAL-era scripts out of `scripts/` (kept `seed.ts`), 15 unused scaffold dependencies (8× @radix-ui, cva, clsx, tailwind-merge, tailwindcss-animate, tw-animate-css, zustand, z-ai-web-dev-sdk) plus the dead shadcn `components.json`, and the two committed ssh shims that violated the push runbook's "never commit the shim" rule. The dependency allowlist is now pinned by `tests/deps.test.ts` (unit suite 29 → 33). Cleanup proven behavior-neutral: identical build route table, 28/28 e2e, live parity byte-exact before and after; product loop re-verified under an active ambient `DATABASE_URL` hijack value.
+- `[S8]` Session-8 HTTP-edge hardening (see `docs/remediation-plan-session8.md`): a fresh-eyes audit surfaced the login user-enumeration TIMING oracle (unknown email short-circuited scrypt), first-token XFF rate-limit keying, the client discarding the 422 field map, impossible calendar dates passing via JS Date rollover, reveal content lost on client-bundle failure, the heartbeat animation's missing reduced-motion guard, and a tel: href parity deviation. Remediated TDD-first with two new pure seams (`src/lib/validation.ts` — calendar round-trip rejection + specialty allowlist derived from content.ts; `src/lib/rate-limit.ts` — LAST-token XFF keying + fixed-window limiter + 64 KiB body cap), `DUMMY_HASH`/`verifyLoginPassword` timing equalization in auth.ts, per-field 422 rendering with aria wiring in both forms, the reveal self-heal timer (inline script, cancelled by the first Reveal mount), true TS strict (noImplicitAny; ignoreBuildErrors removed so the build enforces types), `metadataBase` wired to NEXT_PUBLIC_SITE_URL, `@types/node` declared, and an explicit playwright AUTH_SECRET. Unit suite 33 → 65; e2e 28 → 34; live parity re-verified byte-exact; product loop green under the active ambient hijack.
 
 ---
 
@@ -610,12 +611,12 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 
 | Category | Files | Tests | Location | Framework |
 | -------- | ----- | ----- | -------- | --------- |
-| Unit (pure seams) | 3 | 33 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (14), `tests/deps.test.ts` (4) | Vitest |
+| Unit (pure seams) | 5 | 65 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (18, incl. timing equalization), `tests/deps.test.ts` (4), `tests/validation.test.ts` (18), `tests/rate-limit.test.ts` (10) | Vitest |
 | E2E chrome contract | 1 | 7 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
-| E2E landing parity | 1 | 9 | `tests/e2e/landing.spec.ts` (incl. title pin) | Playwright |
-| E2E write path | 1 | 4 | `tests/e2e/appointment-form.spec.ts` | Playwright |
+| E2E landing parity | 1 | 10 | `tests/e2e/landing.spec.ts` (incl. title + tel: pins) | Playwright |
+| E2E write path | 1 | 9 | `tests/e2e/appointment-form.spec.ts` (incl. 422 UI, 429, 413, impossible dates) | Playwright |
 | E2E legal pages | 1 | 3 | `tests/e2e/legal-pages.spec.ts` (incl. title pins) | Playwright |
-| E2E auth loop | 1 | 5 | `tests/e2e/auth.spec.ts` | Playwright |
+| E2E auth loop | 1 | 6 | `tests/e2e/auth.spec.ts` (incl. enumeration parity, cookie flags) | Playwright |
 
 ### 7.2 Test Patterns
 
@@ -629,16 +630,16 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 ### 7.3 Coverage Thresholds
 
 No numeric threshold configured (content-rendering app; the meaningful
-coverage is the parity surface). The gate is pass/fail: 33/33 unit,
-28/28 e2e.
+coverage is the parity surface). The gate is pass/fail: 65/65 unit,
+34/34 e2e.
 
 ### 7.4 Pre-Push Checklist
 
 - [ ] `bun run lint` — 0 errors
-- [ ] `bun run typecheck` — clean
-- [ ] `bun run test` — 33/33 (db-path 15 + auth 14 + deps 4)
-- [ ] `bun run build` — standalone output produced
-- [ ] `bun run test:e2e` — 28/28 (requires the build)
+- [ ] `bun run typecheck` — clean (true strict)
+- [ ] `bun run test` — 65/65 (db-path 15 + auth 18 + deps 4 + validation 18 + rate-limit 10)
+- [ ] `bun run build` — standalone output produced (types enforced — no ignoreBuildErrors)
+- [ ] `bun run test:e2e` — 34/34 (requires the build)
 - [ ] `git status` clean of secrets/artifacts before commit
 
 ---
@@ -717,13 +718,15 @@ bun run dev            # verify: curl localhost:3000/api/health
 
 | Priority | Issue | Impact | Status |
 | -------- | ----- | ------ | ------- |
-| LOW | Radix UI dependencies installed but unused | bundle unaffected (tree-shaken), install weight only | Open — remove if budget tightens |
 | LOW | Dark token set ships without a UI toggle | none (inert CSS, mirrors reference) | Open by design |
 | LOW | Rate limiter is per-process memory | resets on restart; wrong under horizontal scaling (not the deployment shape) | Documented in §6 |
+| LOW | Rate-limit key trust boundary | direct exposure (no proxy) can still be spoofed via fabricated XFF — App Router route handlers cannot read the socket address; the limiter keys on the LAST (proxy-appended) XFF token, correct behind both proxy styles | Documented in DEPLOYMENT.md §6 — run behind the mandated proxy |
 | LOW | `braces` + `deepmerge-ts` dev-chain advisories | dev-time only (eslint/prisma tooling); no runtime exposure | Accepted — awaiting upstream fixes |
 | LOW | Dashboard is read-only (no status transitions on appointments) | staff can review but not mark confirmed/done | Backlog — natural next feature |
+| LOW | No skip-to-content link (WCAG 2.4.1) | keyboard users tab through the fixed header on every page | Reference-shared limitation — the reference has no skip link either (probed session 8); parity doctrine keeps it out |
 | INFO | ±1/255 oklab quantization drift on opacity-modified colors | imperceptible; asserted with tolerance in e2e | Accepted (ADR-003) |
 | INFO | dotenv interpolates a leading `$` to empty string | seed credentials silently vanish if unescaped | Documented in README + `.env.example` (`\$`) |
+| INFO | `aria-controls` on the menu trigger dangles while closed | cosmetic axe flag; the panel unmounts exactly like the reference (probed session 8) | Kept for parity — the reference unmounts too |
 
 ---
 

@@ -75,11 +75,17 @@ test.describe("staff authentication", () => {
     await expect(page.getByText(callerEmail)).toBeVisible();
     await expect(page.getByText("Women's health").first()).toBeVisible();
 
-    // The session cookie is present and httpOnly.
+    // The session cookie is present and carries the documented flags:
+    // httpOnly + SameSite=Lax always; Secure when NODE_ENV=production —
+    // which the e2e standalone server IS, so the production flag is
+    // directly observable here (Chrome stores Secure cookies on the
+    // http localhost origin because it is a secure context).
     const cookies = await page.context().cookies();
     const session = cookies.find((c) => c.name === "clinic_session");
     expect(session).toBeDefined();
     expect(session?.httpOnly).toBe(true);
+    expect(session?.sameSite).toBe("Lax");
+    expect(session?.secure).toBe(true);
 
     // Logout clears the cookie and returns to the login surface.
     await page.getByRole("button", { name: "Sign out" }).click();
@@ -102,5 +108,32 @@ test.describe("staff authentication", () => {
       email: expect.any(String),
       password: expect.any(String),
     });
+  });
+
+  test("unknown email and wrong password are indistinguishable (no enumeration)", async ({ request }) => {
+    // Body/status parity for the two failure paths (session-8 F1). The
+    // TIMING half of the contract — scrypt runs on both paths via
+    // DUMMY_HASH — is pinned at the unit layer (tests/auth.test.ts); here
+    // we pin that nothing about the RESPONSE lets an attacker tell the
+    // difference. Dedicated spoofed XFF key keeps the limiter isolated.
+    const headers = { "X-Forwarded-For": "203.0.113.50" };
+    const unknown = await request.post("/api/auth/login", {
+      headers,
+      data: { email: "nobody@greengrove.test", password: "whatever-password" },
+    });
+    const wrong = await request.post("/api/auth/login", {
+      headers,
+      data: { email: E2E_ADMIN_EMAIL, password: "definitely-not-the-password" },
+    });
+
+    expect(unknown.status()).toBe(401);
+    expect(wrong.status()).toBe(401);
+    const unknownBody = await unknown.json();
+    const wrongBody = await wrong.json();
+    expect(unknownBody).toEqual(wrongBody);
+    expect(unknownBody.error).toBe("Incorrect email or password.");
+    // No cookie on either path.
+    expect(unknown.headers()["set-cookie"]).toBeUndefined();
+    expect(wrong.headers()["set-cookie"]).toBeUndefined();
   });
 });

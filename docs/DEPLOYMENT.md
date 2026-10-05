@@ -77,7 +77,15 @@ the database is unreachable — wire your uptime monitor to it.
 ## 6. Reverse proxy notes
 
 - Forward `X-Forwarded-For` — the appointment AND login rate limiters key
-  on it.
+  on it. Both styles work, because the limiter keys on the **LAST**
+  X-Forwarded-For token (the address the proxy appended — the only
+  trustworthy one):
+  - append style: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`
+  - overwrite style: `proxy_set_header X-Forwarded-For $remote_addr;`
+  Known limitation (accepted): App Router route handlers cannot read the
+  socket address, so a server exposed DIRECTLY (no proxy) can still be
+  spoofed via a fabricated XFF header — run behind the proxy. Proxy-less
+  requests (local dev) share a single `unknown` bucket.
 - Serve `/media/hero-video.mp4` (11 MB) with caching headers or from a
   CDN in front of the app.
 - One cookie exists (`clinic_session`, httpOnly, SameSite=Lax, Secure in

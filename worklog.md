@@ -128,3 +128,28 @@ Work Log:
 Stage Summary:
 - Cleanup proven behavior-neutral end-to-end; install surface minus 15 packages + 16 dead files
 - Committed on main and pushed via docs/ssh_git_wrapper_v3.py; remote ref verified; key shredded
+
+---
+Task ID: 7
+Agent: Super Z (main orchestrator)
+Task: Session 8 — HTTP-edge hardening, validation seams, a11y completion, parity re-verification, push
+
+Work Log:
+- Refreshed workspace via git pull to 683691b (docs-only: operator pasted session-6 transcript as docs/session_7.md); read all root docs + session logs 6/7 + remediation-plan-session6; validated claims against the tree; environment intact
+- Baseline gates all green before changes: lint 0 / tsc / 33 unit / build (identical route table) / 28 e2e
+- Fresh-eyes full audit (code-review-and-audit fallback pipeline) surfaced the HTTP-edge findings: login timing-enumeration oracle (scrypt short-circuit), first-token XFF rate-limit keying (client-controllable), client discarding the 422 fields map, impossible calendar dates passing via JS Date rollover (verified empirically), reveal content lost on bundle failure, heartbeat reduced-motion guard gap, tel: href parity deviation (contact/footer), TS-strict/doc contradictions, phantom @types/node, playwright implicit AUTH_SECRET
+- Live parity re-verified (agent-browser, both sites, 1440x900 + 390x844): 7490px both, h2/h3 identical; mobile panel byte-exact (192x148 @ top 80/xRight 370, grid, r24, p8, oklab paint); link-click closes + jumps to servicesTop 0.421875 both (re-measured via the visible panel after an initial probe hit the hidden desktop link); NEW reference probes: no date-input min, uniform tel:+11234567890, native validation posture, closed-panel unmounted, <main> present, no skip link
+- Product loop re-verified under ACTIVE ambient DATABASE_URL hijack: POST -> 201 -> row in <repo>/db/custom.db -> dashboard renders it; this session's own un-guarded probe script was redirected by the ambient value (Error 14) — the exact threat ADR-010 guards against
+- Wrote docs/remediation-plan-session8.md; validated against codebase; executed via TDD:
+  * tests/validation.test.ts (18) + src/lib/validation.ts — validateAppointmentPayload with calendar round-trip rejection, specialty allowlist DERIVED from content.ts services, non-object-body tolerance (was a 500)
+  * tests/rate-limit.test.ts (10) + src/lib/rate-limit.ts — clientKey (LAST XFF token), createRateLimiter (injectable clock), bodyTooLarge (64 KiB cap -> 413)
+  * auth.ts DUMMY_HASH + verifyLoginPassword (+4 tests incl. >=10ms scrypt floor) — login burns identical CPU on unknown-email and wrong-password paths
+  * Both routes rewired to the seams; appointment-form renders per-field 422 errors (aria-invalid/describedby); login-form drops noValidate; heartbeat reduced-motion guard; hero video pauses under prefers-reduced-motion; reveal bundle-failure self-heal (inline 9s timer + first-mount cancel — verified live BOTH ways with .js requests aborted)
+  * content.ts tel: -> +11234567890 (parity fix); tsconfig true strict; ignoreBuildErrors removed; metadataBase wired; @types/node declared; playwright AUTH_SECRET explicit; DEPLOYMENT.md XFF proxy guidance
+  * e2e +6: impossible dates, 422 field-error UI, 429 under dedicated spoofed XFF key (isolated bucket — no suite poisoning), 413 cap, login enumeration parity, tel: uniformity pin; cookie contract extended (sameSite/secure)
+- Post-remediation gate: lint 0 / tsc (true strict) / 65 unit / build identical routes / 34 e2e; live parity spot-checks unchanged; product loop green; 11 screenshots refreshed (incl. NEW 14-appointment-field-errors, 15-dashboard-mobile-390-full)
+- Session docs: session_8.md, this entry, SKILL.md v2.3.0, PAD [S8], README/CLAUDE/AGENTS counts
+
+Stage Summary:
+- HTTP edge hardened (timing, keying, size, validation); a11y gaps closed; parity preserved byte-exact — 7490px and the mobile menu contract re-verified on both sites
+- Committed on main and pushed via docs/ssh_git_wrapper_v3.py; remote ref verified; key shredded

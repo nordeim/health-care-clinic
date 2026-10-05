@@ -183,12 +183,12 @@ export const clinicContact = {
   addressLines: ["500 Terry Francine Street,", "San Francisco, CA 94158"],
   email: "info@mysite.com",
   phone: "123-456-7890",
-  phoneHref: "tel:1234567890",
+  phoneHref: "tel:+11234567890",
 } as const;
 
 export const footerContact = {
   addressLines: ["100 Wellness Way", "Springfield, USA 12345"],
   hoursLines: ["Mon–Fri: 8am–6pm", "Saturday: 9am–1pm"],
   phone: "123-456-7890",
-  phoneHref: "tel:1234567890",
+  phoneHref: "tel:+11234567890",
 } as const;

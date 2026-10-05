@@ -4,8 +4,14 @@ import {
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
   signSession,
-  verifyPassword,
+  verifyLoginPassword,
 } from "@/lib/auth";
+import {
+  MAX_BODY_BYTES,
+  bodyTooLarge,
+  clientKey,
+  createRateLimiter,
+} from "@/lib/rate-limit";
 
 /* ---------------------------------------------------------------------------
  * POST /api/auth/login — staff sign-in for the appointment dashboard.
@@ -15,48 +21,30 @@ import {
  *  - 200 {ok: true} sets a httpOnly session cookie (7 days, SameSite=Lax,
  *    Secure in production) on success.
  *  - 401 with a GENERIC message on unknown email or wrong password — no
- *    user-enumeration oracle.
- *  - 422 with a field map on missing/invalid shapes.
- *  - 429 when the per-IP fixed-window limiter trips (10 attempts / 10 min),
- *    the same doctrine as /api/appointments.
+ *    user-enumeration oracle, in BOTH the response body AND the timing
+ *    channel: verifyLoginPassword always burns scrypt, even for unknown
+ *    emails (see src/lib/auth.ts DUMMY_HASH).
+ *  - 413 when the body exceeds 64 KiB; 422 with a field map on
+ *    missing/invalid shapes.
+ *  - 429 when the per-IP fixed-window limiter trips (10 attempts / 10 min,
+ *    keyed on the LAST X-Forwarded-For token — see src/lib/rate-limit.ts).
  *  - The response never echoes the submitted values back.
  * ------------------------------------------------------------------------- */
 
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_PER_WINDOW = 10;
-const buckets = new Map<string, { count: number; resetAt: number }>();
-
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const bucket = buckets.get(ip);
-  if (!bucket || bucket.resetAt <= now) {
-    buckets.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    return false;
-  }
-  bucket.count += 1;
-  return bucket.count > MAX_PER_WINDOW;
-}
-
-if (typeof setInterval === "function") {
-  const timer = setInterval(() => {
-    const now = Date.now();
-    for (const [ip, bucket] of buckets) {
-      if (bucket.resetAt <= now) buckets.delete(ip);
-    }
-  }, WINDOW_MS);
-  (timer as unknown as { unref?: () => void }).unref?.();
-}
+const limiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 10 });
 
 export async function POST(request: Request) {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
-
-  if (rateLimited(ip)) {
+  if (limiter.rateLimited(clientKey(request))) {
     return NextResponse.json(
       { error: "Too many attempts. Please try again in a few minutes." },
       { status: 429 },
+    );
+  }
+
+  if (bodyTooLarge(request)) {
+    return NextResponse.json(
+      { error: `That request is too large (over ${MAX_BODY_BYTES / 1024} KiB).` },
+      { status: 413 },
     );
   }
 
@@ -86,10 +74,19 @@ export async function POST(request: Request) {
 
   try {
     const admin = await db.adminUser.findUnique({ where: { email } });
-    const ok = admin !== null && verifyPassword(password, admin.passwordHash);
+    // ALWAYS burn scrypt — even for unknown emails (storedHash null →
+    // DUMMY_HASH inside the seam) — so the unknown-email and
+    // wrong-password paths take indistinguishable time. The account
+    // check happens AFTER the password work, never short-circuits it.
+    const passwordOk = verifyLoginPassword(
+      password,
+      admin?.passwordHash ?? null,
+    );
+    const ok = admin !== null && passwordOk;
 
     if (!ok) {
-      // Deliberately identical for unknown email and wrong password.
+      // Deliberately identical for unknown email and wrong password —
+      // in body, status AND response time.
       return NextResponse.json(
         { error: "Incorrect email or password." },
         { status: 401 },

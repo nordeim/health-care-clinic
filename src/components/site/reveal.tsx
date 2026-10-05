@@ -5,8 +5,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 /* ---------------------------------------------------------------------------
  * Reveal-on-scroll choreography.
  *
- * The reference app drives its service cards and the appointment panel with
- * Framer Motion `whileInView`: elements start at
+ * The reference app drives its service cards with Framer Motion
+ * `whileInView`: elements start at
  * `translateX(var(--card-x)) translateY(var(--card-y))` + opacity 0 (the
  * --card-x/--card-y values come from arbitrary-property Tailwind classes on
  * each card) and settle to their natural position once scrolled into view.
@@ -24,7 +24,29 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  *    feature, so the CSS keeps them visible too — the observer hook simply
  *    never fires.
  *  - prefers-reduced-motion pins content visible with no transition.
+ *  - Bundle-failure self-heal (session 8): `scripting: enabled` reflects the
+ *    browser PREFERENCE, not whether scripts actually loaded — if chunks
+ *    404 or are blocked, `[data-reveal="hidden"]` elements would stay at
+ *    opacity 0 forever. The inline fallback timer installed in
+ *    layout.tsx flips any still-hidden element to "shown" after 9s; the
+ *    first Reveal mount here cancels it (the bundle evidently loaded, so
+ *    the observer owns the choreography from here on).
  * ------------------------------------------------------------------------- */
+
+type RevealFallbackTimer = ReturnType<typeof setTimeout>;
+
+/** Cancels the layout's reveal self-heal timer — called by the FIRST Reveal
+ * mount, which proves the client bundle (and therefore the observer) made
+ * it to the page. Idempotent across the many Reveal instances. */
+function cancelRevealFallback(): void {
+  const holder = window as typeof window & {
+    __revealFallback?: RevealFallbackTimer;
+  };
+  if (holder.__revealFallback !== undefined) {
+    clearTimeout(holder.__revealFallback);
+    delete holder.__revealFallback;
+  }
+}
 
 export function Reveal({
   children,
@@ -39,6 +61,7 @@ export function Reveal({
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
+    cancelRevealFallback();
     const node = ref.current;
     if (!node || shown) return;
     if (typeof IntersectionObserver === "undefined") return;

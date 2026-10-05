@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { heroBadgeMessages } from "@/lib/content";
 
@@ -17,6 +17,7 @@ import { heroBadgeMessages } from "@/lib/content";
 
 export function Hero() {
   const [badgeIndex, setBadgeIndex] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const id = setInterval(
@@ -24,6 +25,28 @@ export function Hero() {
       2500,
     );
     return () => clearInterval(id);
+  }, []);
+
+  // WCAG 2.2.2: the hero video autoplays and loops — for users who ask for
+  // reduced motion it is pinned to its first frame (poster language) via a
+  // DOM-only effect. No state, so hydration is untouched; everyone else
+  // sees the reference's untouched autoplay behavior.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || typeof window.matchMedia !== "function") return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => {
+      if (reduced.matches) {
+        video.pause();
+      } else {
+        void video.play().catch(() => {
+          /* autoplay can be refused — the poster remains; same as before */
+        });
+      }
+    };
+    sync();
+    reduced.addEventListener("change", sync);
+    return () => reduced.removeEventListener("change", sync);
   }, []);
 
   const badge = heroBadgeMessages[badgeIndex];
@@ -40,6 +63,7 @@ export function Hero() {
       className="relative min-h-[100svh] overflow-hidden bg-primary text-hero-foreground md:min-h-[100svh]"
     >
       <video
+        ref={videoRef}
         className="absolute inset-0 h-full w-full object-cover"
         autoPlay
         muted

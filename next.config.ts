@@ -7,9 +7,9 @@ const nextConfig: NextConfig = {
   // at .next/standalone/server.js — even when the repo is cloned inside a
   // parent workspace that has its own lockfile.
   outputFileTracingRoot: path.join(import.meta.dirname, "."),
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // No ignoreBuildErrors: `tsc --noEmit` is part of the verification gate
+  // AND the build itself enforces types — the "TypeScript strict" claim in
+  // the docs is backed by both layers now (session-8 config hygiene).
   reactStrictMode: false,
   // Next 16 dev-origin protection silently blocks dev chunks when the page
   // is reached through 127.0.0.1 instead of localhost (symptom: unhydrated

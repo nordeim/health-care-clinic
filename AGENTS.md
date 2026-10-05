@@ -109,7 +109,15 @@ stays byte-faithful. All marketing copy lives in
   scroll-spy state), Hero (rotating badge), AppointmentForm (submit
   states), Reveal (observer), LoginForm and LogoutButton (auth islands).
 - Content (copy, icon maps, nav links) lives in `src/lib/content.ts` —
-  single source of truth, `as const` tuples.
+  single source of truth, `as const` tuples. The appointment validation
+  seam (`src/lib/validation.ts`) DERIVES its specialty allowlist from
+  that list — never hand-copy service names into a second place.
+- Rate limiting + body caps live in `src/lib/rate-limit.ts`: the limiter
+  keys on the LAST `X-Forwarded-For` token (the proxy-appended address);
+  bodies over 64 KiB get a 413 before parsing. The login route ALWAYS
+  burns scrypt (`verifyLoginPassword` + DUMMY_HASH in `src/lib/auth.ts`)
+  — never short-circuit around it, or the timing-enumeration oracle
+  returns.
 - Section ids are a public contract: `#top #about #services #insurance
   #providers #contact #faq` — the nav, scroll-spy, CTAs and e2e specs all
   depend on them.

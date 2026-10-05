@@ -231,6 +231,12 @@ h3 {
   .badge-enter {
     animation: none;
   }
+  /* The ECG heartbeat sweep runs infinitely — the same guard the badge and
+   * reveal choreography already carry (WCAG 2.2.2). Without this, reduced-
+   * motion users got the one animation the other guards missed. */
+  .animate-heartbeat {
+    animation: none;
+  }
 }
 
 /* Native <details> FAQ accordion — the reference uses the `list-none`

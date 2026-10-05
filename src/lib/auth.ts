@@ -55,6 +55,28 @@ function authSecret(): string {
 
 /* ------------------------------ passwords -------------------------------- */
 
+/** A syntactically valid scrypt hash of an unguessable random password.
+ *
+ * Used ONLY by the login route to equalize response time when the email
+ * is unknown: scrypt is CPU-heavy (~30ms at N=16384), and skipping it for
+ * unknown emails would leak which addresses exist through a timing side
+ * channel. Verifying against this constant burns the same CPU as a real
+ * check and always fails — the pre-image is random discarded bytes. */
+export const DUMMY_HASH =
+  "scrypt$daf2d6ea27aeab7b97a47620e25df4ed$803bcf38b0a949855b9e021375fc9f3f5ba8494408755abc5e0ebc96f25cb484";
+
+/** Password check for the login route — ALWAYS runs scrypt, even when no
+ * account exists (storedHash null → verifies against DUMMY_HASH), so the
+ * unknown-email and wrong-password paths take indistinguishable time.
+ * Callers decide success separately (`admin !== null && ok`) AFTER this
+ * call — never short-circuit around it. */
+export function verifyLoginPassword(
+  password: string,
+  storedHash: string | null,
+): boolean {
+  return verifyPassword(password, storedHash ?? DUMMY_HASH);
+}
+
 export function hashPassword(password: string): string {
   const salt = randomBytes(16);
   const hash = scryptSync(password, salt, SCRYPT_KEYLEN, SCRYPT_COST);

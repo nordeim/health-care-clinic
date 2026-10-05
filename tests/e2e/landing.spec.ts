@@ -104,4 +104,17 @@ test.describe("landing page", () => {
       footer.getByRole("link", { name: "Accessibility Statement" }),
     ).toHaveAttribute("href", "/accessibility-statement");
   });
+
+  test("every phone link uses the reference's uniform tel: format", async ({ page }) => {
+    // The reference site uses tel:+11234567890 for EVERY phone link; the
+    // clone's contact + footer briefly shipped tel:1234567890 (content.ts)
+    // — a real parity deviation, fixed and pinned here (session-8 F7).
+    const telHrefs = await page.locator("a[href^='tel:']").evaluateAll(
+      (links) => links.map((link) => link.getAttribute("href")),
+    );
+    expect(telHrefs.length).toBeGreaterThanOrEqual(3); // contact + footer + form-success context
+    for (const href of telHrefs) {
+      expect(href).toBe("tel:+11234567890");
+    }
+  });
 });

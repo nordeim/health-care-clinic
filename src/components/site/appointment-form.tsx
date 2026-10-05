@@ -21,9 +21,22 @@ type Status = "idle" | "sending" | "success" | "error";
 const inputClassName =
   "rounded-none border-0 border-b border-primary/40 bg-transparent px-0 py-4 outline-none transition-colors focus:border-primary focus:ring-0";
 
+/* Server 422s carry a per-field map (`{error, fields}`); rendering those
+ * messages next to their inputs (with aria-invalid/aria-describedby) is
+ * what makes the API's "Please check the highlighted fields." headline
+ * literally true. Non-field failures (401/429/500/network) keep the
+ * generic alert. Error-state DOM is this repo's own extension surface —
+ * the reference has no backend and never renders it. */
+type FieldErrors = Partial<Record<"fullName" | "phone" | "email" | "specialty" | "preferredDate", string>>;
+
+function fieldErrorText(errors: FieldErrors | null, key: keyof FieldErrors): string | undefined {
+  return errors?.[key];
+}
+
 export function AppointmentForm() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -32,6 +45,7 @@ export function AppointmentForm() {
 
     setStatus("sending");
     setErrorMessage(null);
+    setFieldErrors(null);
 
     try {
       const response = await fetch("/api/appointments", {
@@ -48,8 +62,11 @@ export function AppointmentForm() {
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as
-          | { error?: string }
+          | { error?: string; fields?: FieldErrors }
           | null;
+        if (response.status === 422 && body?.fields) {
+          setFieldErrors(body.fields);
+        }
         throw new Error(body?.error ?? `Request failed (${response.status})`);
       }
 
@@ -97,54 +114,99 @@ export function AppointmentForm() {
       noValidate={false}
       className="mt-8 grid gap-x-6 gap-y-4 sm:grid-cols-2"
     >
-      <input
-        type="text"
-        name="fullName"
-        required
-        aria-label="Full name"
-        placeholder="Full name"
-        autoComplete="name"
-        disabled={sending}
-        className={inputClassName}
-      />
-      <input
-        type="tel"
-        name="phone"
-        required
-        aria-label="Phone number"
-        placeholder="Phone number"
-        autoComplete="tel"
-        disabled={sending}
-        className={inputClassName}
-      />
-      <input
-        type="email"
-        name="email"
-        aria-label="Email (optional)"
-        placeholder="Email (optional)"
-        autoComplete="email"
-        disabled={sending}
-        className={inputClassName}
-      />
-      <select
-        name="specialty"
-        aria-label="Specialty"
-        defaultValue="Primary Care"
-        disabled={sending}
-        className={inputClassName}
-      >
-        <option>Primary Care</option>
-        {services.map((service) => (
-          <option key={service.title}>{service.title}</option>
-        ))}
-      </select>
-      <input
-        type="date"
-        name="preferredDate"
-        aria-label="Preferred date"
-        disabled={sending}
-        className={inputClassName}
-      />
+      <div className="grid content-start">
+        <input
+          type="text"
+          name="fullName"
+          required
+          aria-label="Full name"
+          placeholder="Full name"
+          autoComplete="name"
+          disabled={sending}
+          aria-invalid={fieldErrorText(fieldErrors, "fullName") ? true : undefined}
+          aria-describedby={fieldErrorText(fieldErrors, "fullName") ? "fullName-error" : undefined}
+          className={inputClassName}
+        />
+        {fieldErrorText(fieldErrors, "fullName") ? (
+          <p id="fullName-error" className="pt-1 text-sm text-destructive">
+            {fieldErrors?.fullName}
+          </p>
+        ) : null}
+      </div>
+      <div className="grid content-start">
+        <input
+          type="tel"
+          name="phone"
+          required
+          aria-label="Phone number"
+          placeholder="Phone number"
+          autoComplete="tel"
+          disabled={sending}
+          aria-invalid={fieldErrorText(fieldErrors, "phone") ? true : undefined}
+          aria-describedby={fieldErrorText(fieldErrors, "phone") ? "phone-error" : undefined}
+          className={inputClassName}
+        />
+        {fieldErrorText(fieldErrors, "phone") ? (
+          <p id="phone-error" className="pt-1 text-sm text-destructive">
+            {fieldErrors?.phone}
+          </p>
+        ) : null}
+      </div>
+      <div className="grid content-start">
+        <input
+          type="email"
+          name="email"
+          aria-label="Email (optional)"
+          placeholder="Email (optional)"
+          autoComplete="email"
+          disabled={sending}
+          aria-invalid={fieldErrorText(fieldErrors, "email") ? true : undefined}
+          aria-describedby={fieldErrorText(fieldErrors, "email") ? "email-error" : undefined}
+          className={inputClassName}
+        />
+        {fieldErrorText(fieldErrors, "email") ? (
+          <p id="email-error" className="pt-1 text-sm text-destructive">
+            {fieldErrors?.email}
+          </p>
+        ) : null}
+      </div>
+      <div className="grid content-start">
+        <select
+          name="specialty"
+          aria-label="Specialty"
+          defaultValue="Primary Care"
+          disabled={sending}
+          aria-invalid={fieldErrorText(fieldErrors, "specialty") ? true : undefined}
+          aria-describedby={fieldErrorText(fieldErrors, "specialty") ? "specialty-error" : undefined}
+          className={inputClassName}
+        >
+          <option>Primary Care</option>
+          {services.map((service) => (
+            <option key={service.title}>{service.title}</option>
+          ))}
+        </select>
+        {fieldErrorText(fieldErrors, "specialty") ? (
+          <p id="specialty-error" className="pt-1 text-sm text-destructive">
+            {fieldErrors?.specialty}
+          </p>
+        ) : null}
+      </div>
+      <div className="grid content-start">
+        <input
+          type="date"
+          name="preferredDate"
+          aria-label="Preferred date"
+          disabled={sending}
+          aria-invalid={fieldErrorText(fieldErrors, "preferredDate") ? true : undefined}
+          aria-describedby={fieldErrorText(fieldErrors, "preferredDate") ? "preferredDate-error" : undefined}
+          className={inputClassName}
+        />
+        {fieldErrorText(fieldErrors, "preferredDate") ? (
+          <p id="preferredDate-error" className="pt-1 text-sm text-destructive">
+            {fieldErrors?.preferredDate}
+          </p>
+        ) : null}
+      </div>
       <button
         type="submit"
         disabled={sending}

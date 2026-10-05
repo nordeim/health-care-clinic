@@ -36,7 +36,7 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 4. **IMPLEMENT** — One component per section; copy centralized; server
    components unless interaction demands a client island.
 5. **VERIFY** — Gate: `bun run lint && bun run typecheck && bun run test &&
-   bun run build`, then Playwright e2e (28 tests) plus in-browser
+   bun run build`, then Playwright e2e (34 tests) plus in-browser
    interaction checks at desktop and mobile widths.
 6. **DOCUMENT** — Engine-variance findings go into
    `docs/Tailwind-V4-Validation-Report.md` (trap log) and ADRs in
@@ -118,18 +118,25 @@ non-obvious-rules list; this file holds the reasoning.
 
 - **Unit (Vitest):** pure seams only — the SQLite URL resolution contract
   (`tests/db-path.test.ts`, 15 cases), the staff-auth crypto contract
-  (`tests/auth.test.ts`, 14 cases: scrypt round-trips, salt uniqueness,
-  HMAC tamper/expiry rejection, env fallback rules), and the dependency
-  contract (`tests/deps.test.ts`, 4 cases: runtime/dev allowlist set
+  (`tests/auth.test.ts`, 18 cases: scrypt round-trips, salt uniqueness,
+  HMAC tamper/expiry rejection, env fallback rules, login timing
+  equalization via DUMMY_HASH), the dependency contract
+  (`tests/deps.test.ts`, 4 cases: runtime/dev allowlist set
   equality, no removed scaffold package creeps back, `scripts/` holds only
-  `seed.ts`).
+  `seed.ts`), the appointment validation seam (`tests/validation.test.ts`,
+  18 cases: impossible-calendar-date rejection, specialty allowlist
+  derived from content.ts, bounds and defaulting), and the rate-limit seam
+  (`tests/rate-limit.test.ts`, 10 cases: last-token XFF keying, window
+  expiry, max boundary, body cap).
 - **E2E (Playwright):** five spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
-  (section content, anchors, FAQ, CTA scroll), `appointment-form`
-  (happy path + 422 validation + health), `legal-pages`, `auth` (login
-  page, wrong credentials, session cookie contract, dashboard guard,
-  logout, full public-form→dashboard loop). Single worker, shared scratch
-  DB (`db/e2e.db`), standalone server on :3100.
+  (section content, anchors, FAQ, CTA scroll, tel: uniformity),
+  `appointment-form` (happy path + 422 validation + 422 UI field errors +
+  429 + 413 + impossible dates + health), `legal-pages`, `auth` (login
+  page, wrong credentials, session cookie contract incl. sameSite/Secure,
+  dashboard guard, logout, full public-form→dashboard loop, enumeration
+  parity). Single worker, shared scratch DB (`db/e2e.db`), standalone
+  server on :3100.
 - **Parity methodology:** computed-style assertions must read the right
   property per engine (v4 uses standalone `rotate`/`scale` properties);
   colors are rasterized to pixels (oklab vs rgba string formats), never
@@ -204,7 +211,8 @@ reference copy today). Do not inline copy edits into components.
 
 ## Success Metrics
 
-- Verification gate green (lint 0, tsc 0, 33/33 unit, build OK, 28/28 e2e).
+- Verification gate green (lint 0, tsc 0 under true strict, 65/65 unit,
+  build OK, 34/34 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

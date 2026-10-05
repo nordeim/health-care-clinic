@@ -27,6 +27,7 @@ const RUNTIME_ALLOWLIST = [
 const DEV_ALLOWLIST = [
   "@playwright/test",
   "@tailwindcss/postcss",
+  "@types/node",
   "@types/react",
   "@types/react-dom",
   "bun-types",

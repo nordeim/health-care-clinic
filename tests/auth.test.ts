@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  DUMMY_HASH,
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
   hashPassword,
   signSession,
+  verifyLoginPassword,
   verifyPassword,
   verifySession,
 } from "@/lib/auth";
@@ -136,5 +138,38 @@ describe("secret resolution from the environment", () => {
 describe("session cookie contract", () => {
   it("uses the documented cookie name", () => {
     expect(SESSION_COOKIE).toBe("clinic_session");
+  });
+});
+
+describe("login timing equalization (DUMMY_HASH / verifyLoginPassword)", () => {
+  // Session-8 remediation F1: the login route used to short-circuit
+  // (`admin !== null && verifyPassword(...)`), so unknown-email requests
+  // skipped scrypt entirely and answered ~30ms faster than wrong-password
+  // requests — a user-enumeration oracle through the timing channel. The
+  // seam below lets the route burn identical CPU on BOTH failure paths.
+  it("DUMMY_HASH parses as the documented scrypt storage format", () => {
+    // Same shape hashPassword() emits — otherwise verifyPassword would
+    // bail out early (fast path) and defeat the equalization.
+    expect(DUMMY_HASH).toMatch(/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
+  });
+
+  it("verifyLoginPassword returns false for a null stored hash", () => {
+    expect(verifyLoginPassword("any-password", null)).toBe(false);
+    expect(verifyLoginPassword("", null)).toBe(false);
+  });
+
+  it("verifyLoginPassword burns real scrypt time on the null path (no fast-fail)", () => {
+    // scrypt at N=16384 takes ~30ms on this hardware; the non-scrypt path
+    // is <1ms. A 10ms floor separates them by an order of magnitude on
+    // each side — safe against CI flake while still pinning the contract.
+    const started = Date.now();
+    verifyLoginPassword("any-password", null);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(10);
+  });
+
+  it("verifyLoginPassword delegates to verifyPassword for real hashes", () => {
+    const stored = hashPassword("correct-horse");
+    expect(verifyLoginPassword("correct-horse", stored)).toBe(true);
+    expect(verifyLoginPassword("wrong-horse", stored)).toBe(false);
   });
 });
