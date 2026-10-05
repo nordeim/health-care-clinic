@@ -9,6 +9,13 @@ import { hashPassword } from "../src/lib/auth";
  * new credentials updates the existing row's email + password hash, so
  * rotating the staff password is a one-command operation.
  *
+ * NOTE (session-22 F9): the upsert keys on EMAIL — changing ADMIN_EMAIL and
+ * re-seeding creates a SECOND active staff row; the previous account keeps
+ * its login (and outstanding session cookies) until its row is deleted
+ * (deleting the AdminUser row is the documented revocation path — the
+ * dashboard guard re-checks the row on every request). Rotate emails by
+ * deleting the old row: see the schema's AdminUser model.
+ *
  * Idempotent and safe to run repeatedly; prints a confirmation and never
  * echoes the password back. */
 async function main() {

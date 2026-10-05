@@ -3,9 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/* Logout control — the only interactive island on the dashboard page.
- * Clears the session cookie via POST /api/auth/logout, then hard-navigates
- * back to /login (a full reload so the Server Component guard re-runs). */
+/* Logout control — an interactive island on the dashboard page (StatusButton
+ * shares it). Clears the session cookie via POST /api/auth/logout, then
+ * hard-navigates back to /login (a full reload so the Server Component
+ * guard re-runs). */
 
 export function LogoutButton() {
   const router = useRouter();

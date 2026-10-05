@@ -33,8 +33,10 @@ the log tails, never by the wrapper's exit status.
 
 Pixel-faithful clone of `https://health-care-clinic.base44.app/` (a
 Tailwind-v3 Vite SPA) rebuilt on **Next.js 16 App Router + Tailwind CSS
-v4 + Prisma/SQLite**. Landing page + two legal pages + one write path
-(`POST /api/appointments`). The reference itself has NO login or dashboard
+v4 + Prisma/SQLite**. Landing page + two legal pages + one public write
+path (`POST /api/appointments`) plus the staff write paths (`PATCH
+/api/appointments/[id]`, `POST /api/auth/login`, `POST /api/auth/logout`).
+The reference itself has NO login or dashboard
 (its route table is `/`, `/privacy-policy`, `/accessibility-statement`);
 the staff `/login` + `/dashboard` pair is a documented extension beyond
 parity — kept UNLINKED from the landing page so the public experience
@@ -106,9 +108,12 @@ stays byte-faithful. All marketing copy lives in
    Server Component (redirect to `/login`); no middleware exists — don't
    add one without updating the ADR log.
 10. **dotenv `$` interpolation gotcha:** a value starting with `$` in `.env`
-    (e.g. `ADMIN_PASSWORD="$up3rS3cretPass"`) resolves to `""` — escape it as
+    (e.g. `ADMIN_PASSWORD="$<your-password>"`) resolves to `""` — escape it as
     `\$`. This bit the seed script once; the troubleshooting table in
-    README records it.
+    README records it. The example is a placeholder on purpose (session-22
+    F1): a realistic-looking example string gets adopted as the real
+    credential by fresh bootstraps — which re-leaks it once docs are
+    pushed.
 
 ## Conventions
 

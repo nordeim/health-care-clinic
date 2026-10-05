@@ -87,9 +87,9 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 
 ### API Patterns
 
-- `POST /api/appointments` — manual validation (no schema library), fixed
-  -window in-memory rate limit (5 req / 10 min / IP), Prisma insert; JSON
-  errors safe to display verbatim; response never echoes PII back.
+- `POST /api/appointments` — manual validation (no schema library),
+  fixed-window in-memory rate limit (5 req / 10 min / IP), Prisma insert;
+  JSON errors safe to display verbatim; response never echoes PII back.
 - `POST /api/auth/login` / `POST /api/auth/logout` — same validation
   doctrine; generic 401 (no user enumeration); login limiter 10 / 10 min /
   IP; httpOnly SameSite=Lax session cookie signed with `AUTH_SECRET`.
@@ -115,7 +115,10 @@ bun run test:e2e                  # requires the build above
 Env determinism: the `dev`/`build`/`db:*` scripts strip ambient
 `DATABASE_URL` (`env -u`) so the repo `.env` is authoritative; production
 `start` keeps ambient env (DEPLOYMENT.md §4). Dotenv gotcha: escape a
-leading `$` in values (`\$up3rS3cretPass`) or interpolation silently empties it.
+leading `$` in values (`\$<your-password>`) or interpolation silently
+empties it. Keep doc examples as obvious placeholders — a
+realistic-looking example gets adopted as the live credential by fresh
+bootstraps (session-22 F1).
 
 Read `dev.log` (tail) after any dev-server work — hydration errors and
 failed API calls surface there. `AGENTS.md` holds the condensed
@@ -124,7 +127,8 @@ non-obvious-rules list; this file holds the reasoning.
 ## Testing Strategy
 
 - **Unit (Vitest):** pure seams only — the SQLite URL resolution contract
-  (`tests/db-path.test.ts`, 15 cases), the staff-auth crypto contract
+  (`tests/db-path.test.ts`, 19 cases incl. the moduleSelfRoot decode
+  contract), the staff-auth crypto contract
   (`tests/auth.test.ts`, 19 cases: scrypt round-trips, salt uniqueness,
   HMAC tamper/expiry rejection, env fallback rules, login timing
   equalization via DUMMY_HASH, the async-scrypt contract), the dependency
@@ -176,7 +180,12 @@ non-obvious-rules list; this file holds the reasoning.
 - ESLint flat config (`eslint.config.mjs`) including
   `react-hooks/set-state-in-effect` — don't silence it; restructure (the
   Reveal component shows the pattern: sync setState in effects is a smell,
-  initial state must be computable at render time).
+  initial state must be computable at render time). One honest nuance
+  (session-22 F11): Header's sanctioned invoke-the-handler-once-in-effect
+  initial-activation pattern (SKILL §6.2, `header.tsx`) is sync setState
+  through function indirection the rule cannot see — the doc rule and the
+  sanctioned pattern coexist deliberately; prefer render-time computation
+  for NEW code and keep the indirection comment in header.tsx honest.
 - Comments explain WHY (engine traps, cascade reasoning), never WHAT.
 
 ## Git & Version Control
@@ -239,7 +248,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  95/95 unit, build OK, 43/43 e2e).
+  99/99 unit, build OK, 43/43 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

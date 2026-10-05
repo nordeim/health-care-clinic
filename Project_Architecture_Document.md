@@ -24,6 +24,7 @@
 - `[S16]` Session-16 status management + e2e key determinism + lint-gate strengthening + doc-claim honesty (see `docs/remediation-plan-session16.md`): the fresh-eyes audit found the residuals six prior audits missed — framework-generated 308 trailing-slash redirects carry no security headers while the docs claimed "every route/response" (wording corrected everywhere; both edges — the covered 307 and the bare 308 — are now e2e-pinned), the per-run XFF keys had a ~1/200 back-to-back collision (Date.now() % 200 — replaced by the structurally-unique process pid as the key discriminator), a stale eslint rationale kept `no-non-null-assertion` off (re-enabled; the single DOM-canvas exception is inline-disabled; the gate is now 14 correctness rules ON), the dev/start `tee` pipes mask server exit codes (documented in AGENTS.md), the live staff password appeared verbatim in four living docs as the dotenv-escaping example (neutralized to a placeholder; history scrubbing deliberately skipped — never rewrite pushed main), and PAD §11 line counts plus the README/CLAUDE file inventories had drifted (all re-measured and completed). The session also CLOSED the last documented backlog item: appointment status management — the Appointment model gains `status` (allowlisted string, default "new") + `updatedAt`; a session-guarded, rate-limited (60/10min), body-capped `PATCH /api/appointments/[id]` validates through a new pure seam (`validateStatusUpdate`, allowlist DERIVED from content.ts `appointmentStatuses` — one source of truth for API + UI); the dashboard table gains a Status column (badges + Confirm/Complete client island that PATCHes and `router.refresh()`es). Unit suite 85 → 95 (status seam, 10 cases); e2e 41 → 43 (the UI status loop + PATCH edge pins); live parity re-verified byte-exact (7490px; mobile panel 192x148 @ (178,80); link-click 0.421875 both sites); 20 screenshots refreshed (03-desktop-full exactly 1440x7490; dashboard shots show the status column).
 - `[S18]` Session-18 e2e unknown-bucket determinism + dashboard status annunciation + full doc-claim honesty pass (see `docs/remediation-plan-session18.md`): the fresh-eyes audit (11 findings, zero Critical/High/Medium, zero regressions) found the residuals seven prior audits missed — the session-16 F2 "never poison a bucket" claim was overstated for BROWSER-DRIVEN requests: the suite made 3 XFF-less appointments POSTs per run into the shared "unknown" bucket (limit 5/10min), so a second consecutive run against a `reuseExistingServer` instance 429-flaked auth.spec's POST (empirically proven with a double-run repro: run 1 green, run 2 fails at the 6th unknown-bucket POST); the login limiter's unknown bucket took 4 browser logins/run (a third consecutive run would flake). Remediated TDD-first: every browser-driven POST/PATCH now gets its pid-derived per-run key injected via `page.route`/`route.continue` header merge (appointment-form UI_KEY 198.51.106.x, auth APPOINTMENTS_UI_KEY 192.0.5.x + LOGIN_UI_KEY 192.0.6.x, appointments-status LOGIN_UI_KEY 198.51.107.x + PATCH_KEY injection for the StatusButton fetches) — NO request the suite makes touches the "unknown" bucket anymore; the triple-consecutive-run proof went 43/43 × 3 against one persistent server. The dashboard status badge gained `role="status"` (implicit aria-live=polite, WCAG 4.1.3 — the New→Confirmed text mutation now announces; Red-first e2e pin added). The doc pass: README/CLAUDE "13 rules"→14 and "41 tests"→43, StatusButton added to every client-island list, CLAUDE State Management completed, SKILL.md body drift fixed (8 sections, unit breakdown +status 10, Appointment type +status/updatedAt, API contracts +PATCH), PAD §3.2 tree completed, §4.1 ER gained AdminUser + status/updatedAt, §5.3 Radix claim corrected (removed in S6, deps.test.ts-pinned), §5.4 CTA reduced-motion wording, §6.1 APPOINTMENT_SPECIALTIES, §6.3 rewritten to the ADR-008 reality (NextAuth explicitly rejected), §8.2 env table completed, §9.1 +db:seed, §11 re-measured, landing.spec tel: comment corrected. Unit suite 95 (unchanged); e2e 43 (1 extended assertion); live parity re-verified byte-exact (7490px; mobile panel 192×148 @ (178,80); link-click 0.421875 both sites); 20 screenshots refreshed.
 - `[S20]` Session-20 the last XFF-less e2e request + config modernization + doc residuals (see `docs/remediation-plan-session20.md`): the fresh-eyes audit (4 findings, zero Critical/High/Medium, zero regressions of any documented session-2/4/6/8/10/12/14/16/18 fix) found the residual ten prior audits hadn't — the session-18 "no request the suite makes touches the shared 'unknown' limiter bucket" claim was still one request short of literal: auth.spec's malformed-payload login POST (`request.post` with NO headers argument) fed the shared "unknown" login bucket once per run; with the login limit at 10/10min, an 11th consecutive run inside the window against a `reuseExistingServer` instance would 429-flake a test asserting 422 (empirically proven at the API level: 10 XFF-less POSTs → 422×10, the 11th → 429 — the same defect class session-18 F8 closed, horizon moved from 3 runs to 10 but the docs claimed "never"). Remediated TDD-first (Red first, then Green): `MALFORMED_KEY = 192.0.7.${pid}` (spec-unique third octet, disjoint from every base in every spec) now headers that request; a paren-balanced structural grep across all six spec files proves EVERY request-level POST/PATCH carries an XFF header and every browser-driven site injects one via `page.route`/`route.continue` (or aborts before reaching the server) — the claim is now literally true. Plus: `vitest.config.ts` → `vitest.config.mts` (the repo has no `"type"` field, so a `.ts` config loaded as CommonJS and Vite deprecated-warned on every `bun run test`; `.mts` loads natively — warning gone; the two living references moved with it: SKILL §3 and the playwright.config comment), README's Testing-block Vitest row gained the status seam and the Architecture E2E row gained "appointment status management" (session-18 F11 fixed the sibling rows, these two were missed), and the 6 realistic dashboard seed rows were restored after the workspace reset (2 confirmed / 2 new / 2 completed — set through the real PATCH API, double-duty live probe). Unit suite 95 (unchanged, now warning-free); e2e 43 + the DOUBLE-consecutive-run proof (43/43 × 2 within the 10-min window); live parity re-verified byte-exact on both sites at a VERIFIED 1440×900 viewport (7490px both; mobile panel 192×148 @ (178,80); link-click 0.421875 both — the session's measurement hygiene note: assert `innerWidth/innerHeight` before trusting any viewport-flag measurement); 20 screenshots refreshed (03-desktop-full exactly 1440×7490).
+- `[S22]` Session-22 credential-hygiene closure + db-path decode hardening + doc-claim honesty (see `docs/remediation-plan-session22.md`): the fresh-eyes audit (13 findings: 4 Low, 9 Info, zero Critical/High/Medium, zero regressions) found the residual eleven prior audits hadn't — the headline a RESURRECTED credential-hygiene leak: session-16 F5 had "neutralized" the then-live password by swapping the doc example to a new realistic-looking string, but fresh bootstraps (including this session's own) adopted that example as the actual `.env` credential — a login-proven working password was committed in four living docs. Remediated root-cause-first: the live credential rotated to a generated value printed nowhere (old literal → 401), and the four doc escaping-examples switched to the OBVIOUS placeholder `$<your-password>` (escaped) so no future bootstrap can re-adopt them. Plus: db-path's module self-anchor extracted into the tested pure seam `moduleSelfRoot` with `decodeURIComponent` (a repo path with spaces/`#`/non-ASCII no longer silently skips the anchor — 4 new unit tests, TDD Red-first, suite 95 → 99); PAD ADR-009 Consequences de-staled (status transitions shipped session 16), §6.1 rule-6 floor corrected to midnight−1day (the west-of-server tolerance), ADR-002 annotated to the seven-island reality, §3.2's docs/ subtree completed with a deliberate-elision note, §4.2/§7.1/§7.3/§7.4/§11 counts updated to the 99-unit reality; SKILL §1 staff surfaces + §5 tree gained the PATCH route; AGENTS "one write path" qualified as the public one; the CLAUDE "fixed -window" typo fixed and the set-state-in-effect doc tension resolved honestly (header.tsx's invoke-once pattern documented as the sanctioned exception); seed's email-change nuance documented (upsert-by-email leaves the old row active; .env.example gained the caveat); landing.spec's overstating "smooth-scroll" title corrected; the logout-button "only interactive island" comment de-staled. E2E 43/43 + the double-run proof re-confirmed; live parity re-verified byte-exact on both sites at verified viewports (desktop 7490px both; mobile panel 192×148 @ (178,80); link-click 0.421875 both; mobile height 12162 vs 12164 = a 2px sub-pixel drift inside the contact section, recorded as an honest measurement note); pixel-rasterized trap guards green (pill ±1 oklab, dropdown exact); the full product loop with status transitions green under the still-active ambient DATABASE_URL hijack; 20 screenshots refreshed (03-desktop-full exactly 1440×7490); SKILL.md → v2.8.2.
 
 ---
 
@@ -92,6 +93,10 @@ with the reference at desktop and mobile widths.
   Remix (team stack alignment); plain static export (no API routes).
 
 **ADR-002: Server Components by default; four client islands**
+
+> (Extended to seven islands by ADR-008/009 — Header, Hero,
+> AppointmentForm, Reveal, LoginForm, LogoutButton, StatusButton. See
+> AGENTS.md for the current list; this ADR records the session-1 shape.)
 
 - **Context:** The page is 95% static content; only the header chrome
   (menu + scroll-spy), hero badge rotation, appointment form, and reveal
@@ -225,8 +230,9 @@ with the reference at desktop and mobile widths.
   form → validated API → SQLite → staff review) while preserving the
   byte-faithful public experience; the ambiguity is resolved in favor of
   the operator's stated expectation, with the evidence documented.
-- **Consequences:** The dashboard is a review surface only — no edit/state
-  transitions yet (tracked in §10); e2e seeds its own staff account.
+- **Consequences:** status transitions shipped in session 16 (the
+  session-guarded `PATCH /api/appointments/[id]` + the dashboard Status
+  column — see §7.1/§10); e2e seeds its own staff account.
 - **Alternatives Rejected:** Skipping the feature (leaves the operator's
   expectation unmet); linking login in the footer (would deviate from the
   reference's DOM).
@@ -390,10 +396,21 @@ health-care-clinic/
 │   ├── DEPLOYMENT.md                ← production runbook
 │   ├── how-to-git-push-using-ssh-wrapper_SKILL.md
 │   ├── ssh_git_wrapper_v3.py        ← SSH push wrapper (keys stay outside)
+│   ├── session_1..21.md             ← per-session operator/agent transcripts
+│   │                                   (immutable historical records — the
+│   │                                   session-N log + remediation plan pair
+│   │                                   documents every audit + fix wave)
+│   ├── remediation-plan-session{2..20}.md ← the audit→plan→TDD record per wave
+│   ├── skills-inventory.md + prompt/coding-agent docs
 │   └── screenshots/                 ← 20 captured states
 ├── AGENTS.md · CLAUDE.md · README.md · this file
 └── next.config.ts                   ← standalone + allowedDevOrigins + security headers + no dev overlay
 ```
+
+(The docs/ listing above names the load-bearing architecture documents and
+the transcript families; it is deliberately not an exhaustive `ls` — the
+session logs and remediation plans are transcripts, not architecture, and
+grow every session.)
 
 ### 3.3 Critical Code Patterns
 
@@ -527,8 +544,10 @@ it on every guarded request — see ADR-008).
   production.
 - **URL resolution:** relative `file:` URLs resolve against the repo that
   owns `prisma/schema.prisma` — the pure function
-  `resolveDatabaseUrl(envUrl, anchors)` and its 15 unit tests pin the
-  contract across `next dev`, `next build`, and the standalone server.
+  `resolveDatabaseUrl(envUrl, anchors)` and its 19 unit tests pin the
+  contract across `next dev`, `next build`, and the standalone server
+  (the module self-anchor `moduleSelfRoot` decodes %-escaped URLs —
+  session-22 F10).
 - **Migrations:** schema-first via `prisma db push` (dev) — appropriate
   for a single-model greenfield; adopt `prisma migrate` if the model grows
   relational complexity.
@@ -604,7 +623,7 @@ creep back).
 | 3 | Rate limit public write endpoints | fixed-window per-IP map (5/10min) → 429 |
 | 4 | No PII echo in responses or logs | success returns `{ok, id}` only; errors log messages, not payloads |
 | 5 | Secrets never committed | `.gitignore` (`*.key`, `.env`, `ssh-key.txt`); push via the SSH wrapper with keys outside the repo |
-| 6 | Dates rejected in the past | parsed + compared to local midnight |
+| 6 | Dates rejected in the past | parsed + compared to local midnight − 1 day (the west-of-server tolerance — `toleranceFloorDate` in `src/lib/validation.ts`; yesterday is accepted, two days ago is rejected) |
 
 ### 6.2 Security Utilities
 
@@ -647,7 +666,7 @@ end-to-end.
 
 | Category | Files | Tests | Location | Framework |
 | -------- | ----- | ----- | -------- | --------- |
-| Unit (pure seams) | 6 | 95 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin), `tests/status.test.ts` (10: allowlist derivation, case-sensitivity, type tightening, non-object tolerance) | Vitest |
+| Unit (pure seams) | 6 | 99 | `tests/db-path.test.ts` (19, incl. moduleSelfRoot decode), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin), `tests/status.test.ts` (10: allowlist derivation, case-sensitivity, type tightening, non-object tolerance) | Vitest |
 | E2E chrome contract | 1 | 7 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
 | E2E landing parity | 1 | 12 | `tests/e2e/landing.spec.ts` (incl. title + tel: pins, reduced-motion instant-jump pin, baseline security-header pin) | Playwright |
 | E2E write path | 1 | 10 | `tests/e2e/appointment-form.spec.ts` (incl. 422 UI, 429, 413, impossible dates, non-object body, curated transport-failure message) | Playwright |
@@ -667,14 +686,14 @@ end-to-end.
 ### 7.3 Coverage Thresholds
 
 No numeric threshold configured (content-rendering app; the meaningful
-coverage is the parity surface). The gate is pass/fail: 95/95 unit,
+coverage is the parity surface). The gate is pass/fail: 99/99 unit,
 43/43 e2e.
 
 ### 7.4 Pre-Push Checklist
 
 - [ ] `bun run lint` — 0 errors (strengthened ruleset: 14 correctness rules ON, documented offs only — session-12 F3 + session-16 F3)
 - [ ] `bun run typecheck` — clean (true strict)
-- [ ] `bun run test` — 95/95 (db-path 15 + auth 19 + deps 4 + validation 27 + rate-limit 20 + status 10)
+- [ ] `bun run test` — 99/99 (db-path 19 + auth 19 + deps 4 + validation 27 + rate-limit 20 + status 10)
 - [ ] `bun run build` — standalone output produced (types enforced — no ignoreBuildErrors)
 - [ ] `bun run test:e2e` — 43/43 (requires the build)
 - [ ] `git status` clean of secrets/artifacts before commit
@@ -792,7 +811,7 @@ bun run dev            # verify: curl localhost:3000/api/health
 | `src/app/api/auth/login/route.ts` | ~130 | Credential verify, session cookie, login limiter |
 | `src/app/dashboard/page.tsx` | ~286 | Session-guarded stats + appointments table with status transitions (RSC) |
 | `scripts/seed.ts` | ~40 | db:seed staff account upsert |
-| `src/lib/db-path.ts` | ~110 | Pure SQLite URL resolution (tested seam) |
+| `src/lib/db-path.ts` | ~135 | Pure SQLite URL resolution (tested seam, incl. moduleSelfRoot decode) |
 | `tests/e2e/mobile-navigation.spec.ts` | ~170 | Chrome contract + Tailwind v4 trap guards |
 | `tests/e2e/auth.spec.ts` | ~263 | Full auth loop incl. public-form→dashboard visibility + browser-login key injection |
 | `docs/Tailwind-V4-Validation-Report.md` | ~334 | Authoritative engine trap log |

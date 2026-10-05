@@ -48,6 +48,12 @@ export function Header() {
     //    (about/services/insurance, defaulting to about) — the active link
     //    gains `font-semibold` plus the persistent underline
     //    (after:scale-x-100).
+    // The `onScroll()` invocation below (initial activation after mount) is
+    // sync setState through function indirection — a deliberate, documented
+    // exception to the set-state-in-effect smell (SKILL §6.2; CLAUDE.md Code
+    // Quality Standards): the initial chrome state depends on the scroll
+    // position, which only exists client-side, and computing it at render
+    // time would hydration-mismatch.
     const onScroll = () => {
       setPastHero(window.scrollY >= window.innerHeight);
       const line = window.scrollY + window.innerHeight / 2;

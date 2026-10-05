@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14, 16, 18 and 20.
-version: 2.8.1
-last_updated: 2026-10-05
-project_state: 95 unit tests + 43 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning)
+  12, 14, 16, 18, 20 and 22.
+version: 2.8.2
+last_updated: 2026-10-06
+project_state: 99 unit tests + 43 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -51,7 +51,8 @@ so the public experience stays byte-faithful, with `robots: noindex`.
 footer), `/privacy-policy`,
 `/accessibility-statement`, `POST /api/appointments`, `GET /api/health`.
 **Staff surfaces:** `/login`, `/dashboard`, `POST /api/auth/login`,
-`POST /api/auth/logout`.
+`POST /api/auth/logout`, and the session-guarded
+`PATCH /api/appointments/[id]` status-transition write path.
 
 **Recorded title deviation:** the reference's `<title>` is the Base44
 platform placeholder `"Base44 APP"`; this repo deliberately uses semantic
@@ -173,6 +174,7 @@ asymmetry reproduces the reference's specificity cascade.
 ```
 src/app/                     routes + globals.css (the design system)
 src/app/api/appointments/    POST — validation + rate limit + Prisma insert
+src/app/api/appointments/[id]/ PATCH — staff status transitions (session-guarded)
 src/app/api/auth/login|logout/  POST — scrypt verify + cookie set/clear
 src/app/api/health/          GET — SELECT 1 probe
 src/app/login|dashboard/     staff pages (noindex, unlinked from landing)
@@ -296,8 +298,11 @@ Plus the environment/process traps (both bit this project for real):
 7. **Ambient env beats dotenv:** an exported `DATABASE_URL` shadows the
    repo `.env`; writes silently land outside the repo. Mitigation:
    `env -u DATABASE_URL` on dev/build/db scripts (ADR-010).
-8. **dotenv `$` interpolation:** `ADMIN_PASSWORD="$up3rS3cretPass"` resolves to
-   `""` — the seed failed on this exact value. Mitigation: escape `\$`.
+8. **dotenv `$` interpolation:** `ADMIN_PASSWORD="$<your-password>"` (a
+   placeholder, never a real-looking value) resolves to `""` — the seed
+   failed on this exact shape. Mitigation: escape `\$`. Session-22 F1:
+   keep doc examples as obvious placeholders — a realistic-looking example
+   gets adopted as the live credential by fresh bootstraps.
 9. **Important-modifier syntax moved:** v3 `!text-sm` → v4 suffix
    `text-sm!`.
 10. **v4 standalone `rotate`/`scale`/`translate` properties:** computed-
@@ -332,7 +337,7 @@ API calls surface there. API failures log structured messages
 ```bash
 bun run lint          # 0 errors
 bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
-bun run test          # 95/95 (db-path 15 + auth 19 + deps 4 +
+bun run test          # 99/99 (db-path 19 + auth 19 + deps 4 +
                       #  validation 27 + rate-limit 20 + status 10)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
@@ -528,6 +533,7 @@ SESSION_COOKIE = "clinic_session"; SESSION_TTL_SECONDS = 604_800
 // src/lib/db-path.ts
 resolveDatabaseUrl(envUrl: string|undefined, anchors: string[]): string
 standaloneRepoRoot(dir: string): string|null
+moduleSelfRoot(url: string): string|null   // session-22 F10: %-decode + existsSync guard
 candidateRoots(): string[]
 
 // src/lib/content.ts — as const tuples
@@ -794,3 +800,40 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   1440×900 viewport; mobile panel 192×148 @ (178,80); link-click
   0.421875 BOTH); 20 screenshots refreshed (03-desktop-full exactly
   1440×7490).
+- **Session 22** (v2.8.2 — credential-hygiene closure + db-path decode
+  hardening + doc-claim honesty): fresh-eyes audit (13 findings: 4 Low,
+  9 Info, zero Critical/High/Medium, zero regressions) found the residual
+  eleven prior audits hadn't — the headline a RESURRECTED
+  credential-hygiene leak (session-16 F5 had neutralized the
+  then-live password by swapping the doc example to a new string, but
+  that replacement looked like a real strong password, so fresh
+  bootstraps adopted it as the actual `.env` credential — login-proven
+  working this session). Remediated: the live password rotated to a
+  generated value printed nowhere (old literal now 401s), and the four
+  doc escaping-examples switched to the obvious placeholder
+  `\$<your-password>` so no future bootstrap can re-adopt them (root
+  cause fixed, not just the symptom). Plus: db-path's module self-anchor
+  extracted into the tested pure seam `moduleSelfRoot` with
+  `decodeURIComponent` — a repo path containing spaces/`#`/non-ASCII no
+  longer silently skips the anchor (4 new unit tests, TDD Red-first);
+  PAD ADR-009 consequences de-staled (status transitions shipped s16),
+  PAD §6.1 rule-6 floor description corrected to midnight−1day, SKILL
+  §1/§5 gained the PATCH route (the missed-sibling-row class), ADR-002
+  annotated to the seven-island reality, AGENTS "one write path"
+  qualified as the public one, the CLAUDE "fixed -window" typo fixed,
+  the set-state-in-effect doc tension resolved honestly (header.tsx
+  invoke-once pattern documented as the sanctioned exception), seed's
+  email-change nuance documented (upsert-by-email leaves the old row
+  active), landing.spec's over stating "smooth-scroll" title corrected,
+  PAD §3.2's docs/ subtree completed with a deliberate-elision note, and
+  the logout-button "only interactive island" comment de-staled. Unit
+  suite 95 → 99; e2e 43 + the double-run proof re-confirmed (43/43 × 2).
+  Live parity re-verified byte-exact on both sites at verified viewports
+  (desktop 7490px both; mobile panel 192×148 @ (178,80) grid r24 p8;
+  link-click lands #services at 0.421875 on BOTH — identical to the
+  pixel; mobile page height 12162 vs 12164 = a 2px sub-pixel drift
+  inside the contact section, recorded as an honest measurement note);
+  pixel-rasterized trap guards green (pill [37,74,57,204] ±1 oklab,
+  dropdown [38,74,57,230] exact); the full product loop with status
+  transitions green under the still-active ambient DATABASE_URL hijack;
+  20 screenshots refreshed (03-desktop-full exactly 1440×7490).

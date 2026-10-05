@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from "node:
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { resolveDatabaseUrl, standaloneRepoRoot } from "@/lib/db-path";
+import { resolveDatabaseUrl, standaloneRepoRoot, moduleSelfRoot } from "@/lib/db-path";
 
 // The db-path contract (docs/parity-remediation-v2.3.md WS-1):
 // a RELATIVE `file:` URL resolves against the first "anchor" directory that
@@ -137,6 +137,55 @@ describe("standaloneRepoRoot (the Next standalone chdir trap)", () => {
     // with this order it must land in <repo>/db.
     const out = resolveDatabaseUrl("file:../db/custom.db", [repo, standalone]);
     expect(toPosix(out)).toBe(`file:${toPosix(path.join(repo, "db", "custom.db"))}`);
+  });
+});
+
+describe("moduleSelfRoot (the import.meta.url anchor, session-22 F10)", () => {
+  // Anchor 2 of candidateRoots(): the module's own repo root (src/lib → ../../),
+  // guarded by the source file existing on disk (the standalone runtime's
+  // virtual mapping fails that check and is skipped). The URL pathname is
+  // PERCENT-ENCODED — a repo path containing %-escapable characters (space,
+  // `#`, non-ASCII) must be decoded before existsSync, or the anchor is
+  // silently skipped and resolution falls back to the CWD.
+  let repoEscaped: string;
+  let repoPlain: string;
+
+  beforeAll(() => {
+    // A repo layout whose directory name contains a space.
+    repoEscaped = mkdtempSync(path.join(tmpdir(), "dbpath-esc-repo-")) + " esc dir";
+    mkdirSync(path.join(repoEscaped, "src", "lib"), { recursive: true });
+    writeFileSync(path.join(repoEscaped, "src", "lib", "db-path.ts"), "// x");
+    // A plain unescaped repo layout (characterization: unchanged behavior).
+    repoPlain = mkdtempSync(path.join(tmpdir(), "dbpath-plain-repo-"));
+    mkdirSync(path.join(repoPlain, "src", "lib"), { recursive: true });
+    writeFileSync(path.join(repoPlain, "src", "lib", "db-path.ts"), "// x");
+  });
+
+  afterAll(() => {
+    rmSync(repoEscaped, { recursive: true, force: true });
+    rmSync(repoPlain, { recursive: true, force: true });
+  });
+
+  it("decodes a percent-escaped module URL and returns the repo root", () => {
+    // The on-disk path contains a space; the URL form encodes it as %20.
+    const fileOnDisk = path.join(repoEscaped, "src", "lib", "db-path.ts");
+    const url = "file://" + encodeURI(toPosix(fileOnDisk));
+    expect(url).toContain("%20"); // the fixture must actually exercise encoding
+    expect(moduleSelfRoot(url)).toBe(repoEscaped);
+  });
+
+  it("returns the repo root for a plain unescaped module URL", () => {
+    const fileOnDisk = path.join(repoPlain, "src", "lib", "db-path.ts");
+    const url = "file://" + toPosix(fileOnDisk);
+    expect(moduleSelfRoot(url)).toBe(repoPlain);
+  });
+
+  it("returns null when the module file does not exist on disk (virtual mapping)", () => {
+    expect(moduleSelfRoot("file:///nonexistent-virtual/src/lib/db-path.ts")).toBeNull();
+  });
+
+  it("returns null for a non-file: URL", () => {
+    expect(moduleSelfRoot("https://example.com/src/lib/db-path.ts")).toBeNull();
   });
 });
 

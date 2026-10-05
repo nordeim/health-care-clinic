@@ -129,7 +129,7 @@ test.describe("landing page", () => {
     await expect(first).not.toHaveAttribute("open", "");
   });
 
-  test("CTA buttons smooth-scroll to the contact section", async ({ page }) => {
+  test("CTA buttons scroll to the contact section", async ({ page }) => {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.getByRole("button", { name: "Get started" }).click();
     await expect(page.locator("#contact")).toBeInViewport({ timeout: 5_000 });

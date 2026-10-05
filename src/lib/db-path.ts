@@ -75,6 +75,30 @@ export function standaloneRepoRoot(dir: string): string | null {
   return path.resolve(dir, "..", "..");
 }
 
+/**
+ * The module self-anchor (session-22 F10): given this module's URL
+ * (typically `import.meta.url`), return the repo root two levels above
+ * src/lib — but ONLY when the source file actually exists on disk at the
+ * DECODED path. URL pathnames are percent-encoded; a repo path containing
+ * %-escapable characters (space, `#`, non-ASCII) must be decoded before
+ * the existence check, or the anchor is silently skipped and resolution
+ * falls back to the CWD. The standalone runtime's virtual mapping fails
+ * the existence check and is skipped by design. Pure + fixture-testable.
+ */
+export function moduleSelfRoot(url: string): string | null {
+  if (!/^file:/i.test(url)) return null;
+  try {
+    const self = decodeURIComponent(new URL(url).pathname);
+    const here = path.dirname(self);
+    if (!here || !existsSync(self)) return null;
+    return path.resolve(here, "..", "..");
+  } catch {
+    // Unparseable URL or a malformed escape — the anchor is skipped and
+    // the remaining anchors apply.
+    return null;
+  }
+}
+
 /** Candidate repo roots for the running process (see module comment). */
 export function candidateRoots(): string[] {
   const roots: string[] = [];
@@ -85,14 +109,12 @@ export function candidateRoots(): string[] {
   //    detector.
   const standaloneRoot = standaloneRepoRoot(process.cwd());
   if (standaloneRoot) roots.push(standaloneRoot);
+  // 2. This module's own repo root (src/lib → ../../) — covers next dev
+  //    and next build, which execute modules from source (see
+  //    moduleSelfRoot for the decoding + existence guards).
   try {
-    // 2. This module's own repo root (src/lib → ../../) — covers next dev
-    //    and next build, which execute modules from source. Validated by
-    //    the source file existing on disk: the standalone runtime's virtual
-    //    mapping fails this check and is skipped.
-    const self = new URL(import.meta.url).pathname;
-    const here = path.dirname(self);
-    if (here && existsSync(self)) roots.push(path.resolve(here, "..", ".."));
+    const selfRoot = moduleSelfRoot(import.meta.url);
+    if (selfRoot) roots.push(selfRoot);
   } catch {
     // import.meta unavailable in this context — remaining anchors apply.
   }
