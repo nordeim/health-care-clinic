@@ -70,7 +70,7 @@ geometry).
 | Database | SQLite via Prisma ORM | 6.x | Appointment + staff persistence |
 | Auth | Node crypto (scrypt + HMAC-SHA256) | built-in | Staff sessions — zero external auth dependencies |
 | Unit tests | Vitest | 5.x | Pure seams (db-path resolution, auth crypto, appointment + status validation, rate limiting, dependency pin) |
-| E2E tests | Playwright | 1.x | Landing, mobile nav, form, legal pages, auth loop |
+| E2E tests | Playwright | 1.x | Landing, mobile nav, form, legal pages, auth loop, appointment status management |
 
 ```mermaid
 flowchart TB
@@ -178,7 +178,7 @@ The `dev` / `build` / `db:*` scripts strip any ambient `DATABASE_URL`
 ```bash
 bun run lint          # ESLint (flat config) — 14 correctness rules ON, every deliberate off documented
 bun run typecheck     # tsc --noEmit (true strict)
-bun run test          # Vitest unit layer (db-path + auth + deps + validation + rate-limit seams)
+bun run test          # Vitest unit layer (db-path + auth + deps + validation + rate-limit + status seams)
 bun run build         # production standalone build (types enforced)
 bun run test:e2e      # Playwright — boots the standalone server + scratch DB
 ```

@@ -7,7 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
 // Prerequisites: `bun run build` (the standalone server must exist).
 // Run with: `bun run test:e2e`.
 //
-// The unit layer stays in Vitest (see vitest.config.ts — it matches
+// The unit layer stays in Vitest (see vitest.config.mts — it matches
 // *.test.ts only, so these *.spec.ts files are never picked up twice).
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);

@@ -23,13 +23,23 @@ import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from "./global-setup";
 // reuseExistingServer instance would 429-flake), and the page.request
 // appointments POST carries APPOINTMENTS_UI_KEY explicitly (it was the
 // 6th "unknown"-bucket POST that 429-flaked run 2 of the double-run
-// repro). After this change NO request the suite makes touches the
-// "unknown" bucket, within or across runs.
+// repro).
+//
+// Session-20 F1: the malformed-payload test (below) was the LAST
+// XFF-less request in the whole suite — 1 login POST per run into the
+// shared "unknown" bucket meant an 11th consecutive run inside the
+// 10-min window against a reuseExistingServer instance would 429-flake
+// a test that asserts 422 (empirically proven at the API level: 10
+// XFF-less POSTs -> 422 x 10, the 11th -> 429). MALFORMED_KEY closes
+// it: after this change no request the suite makes — request-level OR
+// browser-driven — touches the "unknown" bucket, within or across
+// runs, exactly as AGENTS/CLAUDE/SKILL claim.
 const NONOBJECT_KEY = `192.0.2.${process.pid}`;
 const ENUM_KEY = `192.0.3.${process.pid}`;
 const EMAIL_BOUND_KEY = `192.0.4.${process.pid}`;
 const APPOINTMENTS_UI_KEY = `192.0.5.${process.pid}`;
 const LOGIN_UI_KEY = `192.0.6.${process.pid}`;
+const MALFORMED_KEY = `192.0.7.${process.pid}`;
 
 /** Injects the per-run XFF key on every login POST this page makes
  * through the browser (the LoginForm island's fetch) — the request-level
@@ -146,7 +156,10 @@ test.describe("staff authentication", () => {
   });
 
   test("login rejects a malformed payload with a field map", async ({ request }) => {
+    // Session-20 F1: this was the suite's last XFF-less request — it fed
+    // the shared "unknown" login-limiter bucket (see the file header).
     const response = await request.post("/api/auth/login", {
+      headers: { "X-Forwarded-For": MALFORMED_KEY },
       data: { email: "not-an-email", password: "" },
     });
     expect(response.status()).toBe(422);

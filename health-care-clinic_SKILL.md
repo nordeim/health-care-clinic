@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14, 16 and 18.
-version: 2.8.0
+  12, 14, 16, 18 and 20.
+version: 2.8.1
 last_updated: 2026-10-05
-project_state: 95 unit tests + 43 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection (structurally collision-proof, unknown bucket never touched)
+project_state: 95 unit tests + 43 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -119,8 +119,11 @@ there). **Do not remove the `env -u` guards.**
   pinned to repo root for the standalone trace.
 - `tsconfig.json` / `eslint.config.mjs`: both **exclude `skills/`** — the
   repo's skills folder is documentation, never compiled, linted or tested.
-- `vitest.config.ts` matches `*.test.ts` only; `playwright.config.ts`
-  `testDir: tests/e2e` — no double-pickup between layers.
+- `vitest.config.mts` matches `*.test.ts` only; `playwright.config.ts`
+  `testDir: tests/e2e` — no double-pickup between layers. (Renamed from
+  `.ts` in session-20 F4: with no `"type"` field in package.json a `.ts`
+  config loads as CommonJS and Vite warns about ESM syntax; `.mts`
+  loads natively — warning gone.)
 
 ---
 
@@ -762,3 +765,32 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   95 (unchanged); e2e 43 (1 extended assertion). Live parity re-verified
   byte-exact (7490px; mobile panel 192×148 @ (178,80); link-click
   0.421875 BOTH sites); 20 screenshots refreshed.
+- **Session 20** (v2.8.1 — the last XFF-less request + config
+  modernization): fresh-eyes audit (4 findings, zero
+  Critical/High/Medium, zero regressions) found the residual ten prior
+  audits hadn't — the session-18 "unknown bucket never touched" claim
+  was still one request short of literal: auth.spec's malformed-payload
+  login POST carried NO XFF header (1 XFF-less POST per run into the
+  shared "unknown" login bucket, limit 10/10min → an 11th consecutive
+  run inside the window against a `reuseExistingServer` instance would
+  429-flake a test asserting 422; empirically proven at the API level:
+  10 XFF-less POSTs → 422×10, the 11th → 429). Remediated
+  TDD-first: `MALFORMED_KEY = 192.0.7.${pid}` (disjoint from every base
+  in every spec) on that request — a paren-balanced structural grep now
+  proves EVERY request-level POST/PATCH in the suite carries an XFF
+  header, and every browser-driven site injects one via
+  `page.route`/`route.continue` (or aborts before reaching the server).
+  Plus: `vitest.config.ts` → `vitest.config.mts` (native ESM load; the
+  Vite "ESM syntax loaded as CommonJS" deprecation warning is gone; the
+  two living references updated — SKILL §3 and the playwright.config
+  comment), README's Testing-block Vitest row gained the status seam +
+  the Architecture E2E row gained "appointment status management"
+  (session-18 F11 fixed the sibling rows, these two were missed), and
+  the 6 realistic dashboard seed rows were restored after the workspace
+  reset (2 confirmed / 2 new / 2 completed, set via the real PATCH API).
+  Unit suite 95 (unchanged, now warning-free); e2e 43 + the
+  DOUBLE-consecutive-run proof (43/43 × 2 within the 10-min window).
+  Live parity re-verified byte-exact (7490px both sites at a verified
+  1440×900 viewport; mobile panel 192×148 @ (178,80); link-click
+  0.421875 BOTH); 20 screenshots refreshed (03-desktop-full exactly
+  1440×7490).
