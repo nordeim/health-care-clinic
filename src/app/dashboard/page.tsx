@@ -249,7 +249,14 @@ export default async function DashboardPage() {
                         {appointment.preferredDate ?? "—"}
                       </td>
                       <td className="whitespace-nowrap py-4 align-top">
+                        {/* role="status" = implicit aria-live="polite"
+                            (session-18 F10, WCAG 4.1.3): after the
+                            StatusButton's router.refresh() only the mutated
+                            badge text announces — rows reconcile in place
+                            keyed by appointment id, so exactly one
+                            announcement fires per transition. */}
                         <span
+                          role="status"
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             STATUS_BADGE_CLASS[appointment.status] ??
                             "bg-muted text-muted-foreground"

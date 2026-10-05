@@ -36,7 +36,7 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 4. **IMPLEMENT** — One component per section; copy centralized; server
    components unless interaction demands a client island.
 5. **VERIFY** — Gate: `bun run lint && bun run typecheck && bun run test &&
-   bun run build`, then Playwright e2e (41 tests) plus in-browser
+   bun run build`, then Playwright e2e (43 tests) plus in-browser
    interaction checks at desktop and mobile widths.
 6. **DOCUMENT** — Engine-variance findings go into
    `docs/Tailwind-V4-Validation-Report.md` (trap log) and ADRs in
@@ -80,7 +80,8 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 ### State Management
 
 - No global store. Server Components hold the composition; the only client
-  state is local (`useState` in Header/Hero/AppointmentForm/Reveal).
+  state is local (`useState` in Header/Hero/AppointmentForm/Reveal, plus
+  the dashboard islands LoginForm/LogoutButton/StatusButton).
 - Prisma Client is a global singleton via `globalThis` (dev hot-reload
   safety).
 
@@ -155,8 +156,11 @@ non-obvious-rules list; this file holds the reasoning.
   the real UI + PATCH guard/validation/404 pins). Single
   worker, shared scratch DB (`db/e2e.db`), standalone server on :3100;
   EVERY request-level spec derives its spoofed XFF key per run
-  (module constants with spec-unique third octets — a reused server can
-  never poison a bucket, within or across runs). The auth spec also pins
+  (module constants with spec-unique third octets), AND every
+  browser-driven POST/PATCH gets its per-run key injected via
+  `page.route` (session-18 F8) — no request the suite makes touches the
+  shared "unknown" bucket, so a reused server can never poison a bucket,
+  within or across runs. The auth spec also pins
   the login limiter's 429 (10 attempts / 10 min, per-run 198.51.100.x
   spoofed key — disjoint from every other key in the file).
 - **Parity methodology:** computed-style assertions must read the right
@@ -233,7 +237,7 @@ reference copy today). Do not inline copy edits into components.
 
 ## Success Metrics
 
-- Verification gate green (lint 0 under the strengthened ruleset — 13
+- Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
   95/95 unit, build OK, 43/43 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3

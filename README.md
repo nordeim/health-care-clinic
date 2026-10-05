@@ -69,7 +69,7 @@ geometry).
 | Icons | lucide-react | 0.525.x | All iconography |
 | Database | SQLite via Prisma ORM | 6.x | Appointment + staff persistence |
 | Auth | Node crypto (scrypt + HMAC-SHA256) | built-in | Staff sessions — zero external auth dependencies |
-| Unit tests | Vitest | 5.x | Pure seams (db-path resolution, auth crypto) |
+| Unit tests | Vitest | 5.x | Pure seams (db-path resolution, auth crypto, appointment + status validation, rate limiting, dependency pin) |
 | E2E tests | Playwright | 1.x | Landing, mobile nav, form, legal pages, auth loop |
 
 ```mermaid
@@ -176,7 +176,7 @@ The `dev` / `build` / `db:*` scripts strip any ambient `DATABASE_URL`
 ## Testing
 
 ```bash
-bun run lint          # ESLint (flat config) — 13 correctness rules ON, every deliberate off documented
+bun run lint          # ESLint (flat config) — 14 correctness rules ON, every deliberate off documented
 bun run typecheck     # tsc --noEmit (true strict)
 bun run test          # Vitest unit layer (db-path + auth + deps + validation + rate-limit seams)
 bun run build         # production standalone build (types enforced)

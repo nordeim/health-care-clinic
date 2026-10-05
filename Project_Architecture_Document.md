@@ -22,6 +22,7 @@
 - `[S12]` Session-12 email bound + transport tolerance + lint-gate honesty (see `docs/remediation-plan-session12.md`): the fresh-eyes audit found the email field was the only UNBOUNDED payload field (a pattern-valid 60,012-char email persisted — verified live), transport read errors escaped `readJsonBody` and both routes' try/catch as unhandled framework errors (ECONNRESET verified live via a raw-socket mid-body abort), the "lint 0" gate ran with ~24 rules silently disabled, plus: logout fetch without a catch, `reactStrictMode` off without recorded rationale, the "Upcoming visits" stat stricter than the validation tolerance, a non-string `specialty` silently coercing to the default (`{"specialty":42}` → 201 "Primary Care"), seed's dead-code disconnect, and the login route's hand-copied email regex. Remediated TDD-first: `EMAIL_MAX_LENGTH = 254` (255 → 422, 254 → 201, boundary live-probed), the read loop wrapped so transport failures cancel and degrade to 400 (routes always resolve now), specialty type tightening (present-but-non-string → 422; missing/nullish keep the default), `upcomingVisitsFloor()` sharing `toleranceFloorDate()` with the preferredDate validation (stat and API can never disagree), logout `.catch`, seed `process.exitCode`, login importing the seam's `EMAIL_PATTERN`, and a rewritten `eslint.config.mjs` — 13 correctness/dep-safety rules ON at 0 findings, every remaining off documented (no-undef: TS type-only globals; no-img-element: parity `<img>` ports). The three root-href `no-html-link-for-pages` hits converted to `next/link`. New login-limiter e2e pin (10 × 401 then 429 under a per-run 198.51.100.x spoofed key). Unit suite 76 → 85; e2e 37 → 38; live parity re-verified byte-exact (7490px; mobile link-click 0.421875 both sites); 20 screenshots refreshed.
 - `[S14]` Session-14 footer completion + e2e cross-run keys + security headers + login email bound + transport-message curation (see `docs/remediation-plan-session14.md`): the fresh-eyes audit surfaced the residuals five prior audits missed — the two FOOTER legal links still plain `<a>` (and the discovery that `no-html-link-for-pages` is structurally blind to non-root App-Router routes: href normalization appends a trailing slash the route regexes lack, so only root-href anchors can ever match — the rule's blind spot is now recorded in the eslint config and audits must grep for page-href anchors manually), the impossible-dates e2e spec posting 3 requests under a FIXED XFF key (cross-run 429 flake — the session-10 F6 per-run-key doctrine is now applied to EVERY request-level spec via module constants with spec-unique third octets), zero standard security headers with `X-Powered-By` exposed (`next.config.ts` now applies nosniff / X-Frame-Options DENY / Referrer-Policy to every route and suppresses X-Powered-By — e2e-pinned, rendering-invisible so parity untouched; full CSP documented as the reverse-proxy seam's job), `next build` embedding a byte-identical `.env` (staff password + AUTH_SECRET) into `.next/standalone/.env` (DEPLOYMENT.md now warns: strip or rotate), the login email without the 254 bound the appointments route enforces (login now imports `EMAIL_MAX_LENGTH` — one seam, one bound; 300-char email → 422, no new oracle), a stale dev-PII query-log comment (corrected to Prisma 6.11 reality: SQL templates with `?` placeholders only, bound values NOT printed), and raw "Failed to fetch" engine strings surfacing in both forms (TypeError now curated; e2e-pinned via `page.route().abort()`). Unit suite 85 (unchanged); e2e 38 → 41 (login email bound, security headers, transport-failure message — all TDD Red-first); live parity re-verified byte-exact (7490px; mobile link-click 0.421875 both sites); 20 screenshots refreshed (03-desktop-full exactly 1440×7490).
 - `[S16]` Session-16 status management + e2e key determinism + lint-gate strengthening + doc-claim honesty (see `docs/remediation-plan-session16.md`): the fresh-eyes audit found the residuals six prior audits missed — framework-generated 308 trailing-slash redirects carry no security headers while the docs claimed "every route/response" (wording corrected everywhere; both edges — the covered 307 and the bare 308 — are now e2e-pinned), the per-run XFF keys had a ~1/200 back-to-back collision (Date.now() % 200 — replaced by the structurally-unique process pid as the key discriminator), a stale eslint rationale kept `no-non-null-assertion` off (re-enabled; the single DOM-canvas exception is inline-disabled; the gate is now 14 correctness rules ON), the dev/start `tee` pipes mask server exit codes (documented in AGENTS.md), the live staff password appeared verbatim in four living docs as the dotenv-escaping example (neutralized to a placeholder; history scrubbing deliberately skipped — never rewrite pushed main), and PAD §11 line counts plus the README/CLAUDE file inventories had drifted (all re-measured and completed). The session also CLOSED the last documented backlog item: appointment status management — the Appointment model gains `status` (allowlisted string, default "new") + `updatedAt`; a session-guarded, rate-limited (60/10min), body-capped `PATCH /api/appointments/[id]` validates through a new pure seam (`validateStatusUpdate`, allowlist DERIVED from content.ts `appointmentStatuses` — one source of truth for API + UI); the dashboard table gains a Status column (badges + Confirm/Complete client island that PATCHes and `router.refresh()`es). Unit suite 85 → 95 (status seam, 10 cases); e2e 41 → 43 (the UI status loop + PATCH edge pins); live parity re-verified byte-exact (7490px; mobile panel 192x148 @ (178,80); link-click 0.421875 both sites); 20 screenshots refreshed (03-desktop-full exactly 1440x7490; dashboard shots show the status column).
+- `[S18]` Session-18 e2e unknown-bucket determinism + dashboard status annunciation + full doc-claim honesty pass (see `docs/remediation-plan-session18.md`): the fresh-eyes audit (11 findings, zero Critical/High/Medium, zero regressions) found the residuals seven prior audits missed — the session-16 F2 "never poison a bucket" claim was overstated for BROWSER-DRIVEN requests: the suite made 3 XFF-less appointments POSTs per run into the shared "unknown" bucket (limit 5/10min), so a second consecutive run against a `reuseExistingServer` instance 429-flaked auth.spec's POST (empirically proven with a double-run repro: run 1 green, run 2 fails at the 6th unknown-bucket POST); the login limiter's unknown bucket took 4 browser logins/run (a third consecutive run would flake). Remediated TDD-first: every browser-driven POST/PATCH now gets its pid-derived per-run key injected via `page.route`/`route.continue` header merge (appointment-form UI_KEY 198.51.106.x, auth APPOINTMENTS_UI_KEY 192.0.5.x + LOGIN_UI_KEY 192.0.6.x, appointments-status LOGIN_UI_KEY 198.51.107.x + PATCH_KEY injection for the StatusButton fetches) — NO request the suite makes touches the "unknown" bucket anymore; the triple-consecutive-run proof went 43/43 × 3 against one persistent server. The dashboard status badge gained `role="status"` (implicit aria-live=polite, WCAG 4.1.3 — the New→Confirmed text mutation now announces; Red-first e2e pin added). The doc pass: README/CLAUDE "13 rules"→14 and "41 tests"→43, StatusButton added to every client-island list, CLAUDE State Management completed, SKILL.md body drift fixed (8 sections, unit breakdown +status 10, Appointment type +status/updatedAt, API contracts +PATCH), PAD §3.2 tree completed, §4.1 ER gained AdminUser + status/updatedAt, §5.3 Radix claim corrected (removed in S6, deps.test.ts-pinned), §5.4 CTA reduced-motion wording, §6.1 APPOINTMENT_SPECIALTIES, §6.3 rewritten to the ADR-008 reality (NextAuth explicitly rejected), §8.2 env table completed, §9.1 +db:seed, §11 re-measured, landing.spec tel: comment corrected. Unit suite 95 (unchanged); e2e 43 (1 extended assertion); live parity re-verified byte-exact (7490px; mobile panel 192×148 @ (178,80); link-click 0.421875 both sites); 20 screenshots refreshed.
 
 ---
 
@@ -331,11 +332,12 @@ health-care-clinic/
 │   │   ├── page.tsx                 ← landing composition (Header → Footer)
 │   │   ├── api/
 │   │   │   ├── appointments/route.ts ← POST: validate → limit → persist
+│   │   │   ├── appointments/[id]/route.ts ← PATCH: staff status transitions
 │   │   │   ├── auth/login/route.ts   ← POST: scrypt verify + session cookie
 │   │   │   ├── auth/logout/route.ts  ← POST: clear session cookie
 │   │   │   └── health/route.ts      ← GET: SELECT 1 probe
 │   │   ├── login/page.tsx           ← staff sign-in (unlinked, noindex)
-│   │   ├── dashboard/page.tsx       ← session-guarded RSC: stats + table
+│   │   ├── dashboard/page.tsx       ← session-guarded RSC: stats + table + status column
 │   │   ├── privacy-policy/page.tsx
 │   │   └── accessibility-statement/page.tsx
 │   ├── components/site/
@@ -354,23 +356,31 @@ health-care-clinic/
 │   │   └── reveal.tsx               ← client: IntersectionObserver reveal
 │   ├── components/dashboard/
 │   │   ├── login-form.tsx           ← client: staff sign-in island
-│   │   └── logout-button.tsx        ← client: logout island
+│   │   ├── logout-button.tsx        ← client: logout island
+│   │   └── status-button.tsx        ← client: Confirm/Complete status transitions
 │   └── lib/
-│       ├── content.ts               ← ALL copy, icon maps, nav links (as const)
+│       ├── content.ts               ← ALL copy, icon maps, nav links, status labels (as const)
 │       ├── auth.ts                  ← scrypt + HMAC session primitives (unit-tested)
+│       ├── validation.ts            ← appointment + status validation seams (unit-tested)
+│       ├── rate-limit.ts            ← XFF keying, fixed-window limiter, 64 KiB body cap (unit-tested)
+│       ├── motion.ts                ← reduced-motion-aware scroll behavior
 │       ├── db.ts                    ← Prisma singleton with env-resolved URL
 │       └── db-path.ts               ← pure URL resolution (unit-tested)
-├── prisma/schema.prisma             ← Appointment + AdminUser models
+├── prisma/schema.prisma             ← Appointment (incl. status + updatedAt) + AdminUser models
 ├── scripts/seed.ts                  ← db:seed staff upsert (scrypt hash) — the ONLY script
 ├── tests/
 │   ├── db-path.test.ts              ← 15 unit cases (Vitest)
-│   ├── auth.test.ts                 ← 14 unit cases (Vitest)
+│   ├── auth.test.ts                 ← 19 unit cases (Vitest)
 │   ├── deps.test.ts                 ← 4 unit cases (Vitest) — dependency contract pin
-│   └── e2e/                         ← 28 tests (Playwright)
+│   ├── validation.test.ts           ← 27 unit cases (Vitest)
+│   ├── rate-limit.test.ts           ← 20 unit cases (Vitest)
+│   ├── status.test.ts               ← 10 unit cases (Vitest)
+│   └── e2e/                         ← 43 tests (Playwright)
 │       ├── global-setup.ts          ← pushes schema to db/e2e.db + seeds admin
 │       ├── mobile-navigation.spec.ts ← chrome contract + trap guards
-│       ├── landing.spec.ts          ← + title-deviation pin
+│       ├── landing.spec.ts          ← + title-deviation + header characterization pins
 │       ├── appointment-form.spec.ts
+│       ├── appointments-status.spec.ts ← dashboard status loop + PATCH edge pins
 │       ├── legal-pages.spec.ts      ← + title-deviation pins
 │       └── auth.spec.ts             ← login/logout/dashboard guard loop
 ├── public/media/                    ← hero video + poster, 5 section photos
@@ -379,9 +389,9 @@ health-care-clinic/
 │   ├── DEPLOYMENT.md                ← production runbook
 │   ├── how-to-git-push-using-ssh-wrapper_SKILL.md
 │   ├── ssh_git_wrapper_v3.py        ← SSH push wrapper (keys stay outside)
-│   └── screenshots/                 ← 15 captured states
+│   └── screenshots/                 ← 20 captured states
 ├── AGENTS.md · CLAUDE.md · README.md · this file
-└── next.config.ts                   ← standalone + allowedDevOrigins + no dev overlay
+└── next.config.ts                   ← standalone + allowedDevOrigins + security headers + no dev overlay
 ```
 
 ### 3.3 Critical Code Patterns
@@ -489,15 +499,25 @@ erDiagram
         string id PK "cuid()"
         string fullName "3-120 chars, required"
         string phone "7-32 chars, required"
-        string email "optional, RFC-ish validated"
-        string specialty "allow-listed"
+        string email "optional, RFC-ish validated, <=254 chars"
+        string specialty "allow-listed (derived from content.ts)"
         string preferredDate "optional YYYY-MM-DD, not past"
+        string status "allow-listed: new | confirmed | completed"
+        datetime createdAt "default(now())"
+        datetime updatedAt "default(now()) @updatedAt"
+    }
+    ADMIN_USER {
+        string id PK "cuid()"
+        string email "unique — the staff login"
+        string passwordHash "scrypt$saltHex$hashHex"
         datetime createdAt "default(now())"
     }
 ```
 
-Single table `appointments` (mapped from the `Appointment` model), indexed
-on `createdAt` for retention sweeps.
+Two tables — `appointments` (mapped from the `Appointment` model,
+indexed on `createdAt` for retention sweeps) and `admin_users` (the
+single staff login seeded by `db:seed`; session cookies verify against
+it on every guarded request — see ADR-008).
 
 ### 4.2 Persistence Strategy
 
@@ -554,8 +574,10 @@ are reproduced with elements + utilities: pill nav (`bg-foreground/80
 backdrop-blur-md`), dropdown menu panel (`rounded-[24px] bg-foreground/90
 shadow-lg backdrop-blur-md`, GRID layout), underline inputs
 (`border-b border-primary/40`), native `<details>` FAQ, `rounded-[50%]`
-icon badges. Radix deps remain installed but unused — candidates for
-removal if the dependency budget tightens.
+icon badges. No component library and no Radix deps anywhere in the
+dependency tree (the scaffold's unused Radix packages were REMOVED in
+session 6 — `tests/deps.test.ts` pins the allowlist so they can never
+creep back).
 
 ### 5.4 Motion / Animation
 
@@ -566,7 +588,7 @@ removal if the dependency budget tightens.
 | Card reveal | `[data-reveal]` transitions from `--card-x/--card-y` offsets, 0.7s quint-out | pinned visible |
 | Nav underline | `after:` scale-x transition 300ms | transform-only |
 | FAQ plus | `group-open:rotate-45` (v4 standalone `rotate`) | n/a |
-| CTA scroll | `scrollIntoView({behavior:"smooth"})` | browser-controlled |
+| CTA scroll | `scrollIntoView({behavior})` — `"auto"` (instant jump) under `prefers-reduced-motion`, `"smooth"` otherwise (session-10 F7, e2e-pinned) | instant jump under reduced motion |
 
 ---
 
@@ -577,7 +599,7 @@ removal if the dependency budget tightens.
 | # | Rule | Enforcement |
 | - | ---- | ----------- |
 | 1 | All external input validated server-side | `route.ts` validators; 422 + field map on failure |
-| 2 | Specialty is allow-listed, never free text | `ALLOWED_SPECIALTIES` set |
+| 2 | Specialty is allow-listed, never free text | `APPOINTMENT_SPECIALTIES` set (derived from content.ts, exported by validation.ts) |
 | 3 | Rate limit public write endpoints | fixed-window per-IP map (5/10min) → 429 |
 | 4 | No PII echo in responses or logs | success returns `{ok, id}` only; errors log messages, not payloads |
 | 5 | Secrets never committed | `.gitignore` (`*.key`, `.env`, `ssh-key.txt`); push via the SSH wrapper with keys outside the repo |
@@ -592,10 +614,19 @@ removal if the dependency budget tightens.
 
 ### 6.3 Authentication & Authorization
 
-None — the site has no accounts by design ("No account needed. We'll
-confirm your visit by phone"). The write API is public but validated and
-rate-limited. If an admin surface is ever added, put it behind the
-scaffold's NextAuth option and gate `/api/appointments` reads.
+The PUBLIC site has no accounts by design ("No account needed. We'll
+confirm your visit by phone") — the write API is public but validated,
+body-capped and rate-limited. The STAFF surface is a dependency-free
+cookie-session scheme (ADR-008, shipped session 2 and extended in
+session 16): scrypt password verify (async, timing-equalized via
+DUMMY_HASH) + HMAC-SHA256 session tokens signed with `AUTH_SECRET`, an
+httpOnly SameSite=Lax cookie (7 days), a login limiter (10/10min/IP),
+and Server-Component guards on `/dashboard` + `PATCH
+/api/appointments/[id]` (the admin row must still exist — deleting the
+staff account revokes outstanding cookies). NextAuth was explicitly
+rejected at the ADR-008 decision point: the auth surface is two routes
+and one guard, and a dependency-free implementation is unit-pinnable
+end-to-end.
 
 ### 6.4 Threat Model
 
@@ -668,6 +699,9 @@ workspace still lands the server at `.next/standalone/server.js`.
 | ---- | -------- | ----------- | ------- |
 | `DATABASE_URL` | yes | SQLite URL; relative `file:` resolves against the schema repo | `file:../db/custom.db` |
 | `NEXT_PUBLIC_SITE_URL` | no | canonical origin for metadata | `http://localhost:3000` |
+| `AUTH_SECRET` | production | HMAC key for staff session tokens (falls back to an insecure dev constant + console warning when unset) | — |
+| `ADMIN_EMAIL` | seed-time | staff login created/updated by `bun run db:seed` | `admin@example.com` |
+| `ADMIN_PASSWORD` | seed-time | staff login password (escape a leading `$` as `\$` — dotenv interpolation gotcha) | `change-me` |
 
 ### 8.3 Docker Configuration
 
@@ -690,6 +724,7 @@ gate; the SSH wrapper's rules require it green before pushing `main`.
 bun install
 cp .env.example .env
 bun run db:push
+bun run db:seed      # staff login for /login + /dashboard (ADMIN_EMAIL/PASSWORD)
 bun run dev            # verify: curl localhost:3000/api/health
 ```
 
@@ -749,20 +784,20 @@ bun run dev            # verify: curl localhost:3000/api/health
 | `src/components/site/header.tsx` | ~200 | Fixed chrome: mobile menu, scroll-spy, pastHero color swap |
 | `src/components/site/services.tsx` | ~90 | Gradient band + stacked-entrance cards |
 | `src/components/site/appointment-form.tsx` | ~234 | The write path UI with submit states |
-| `src/components/site/reveal.tsx` | ~70 | Hydration-safe reveal choreography |
-| `src/lib/content.ts` | ~190 | All site copy, icon maps, nav contracts |
-| `src/lib/auth.ts` | ~120 | scrypt + HMAC session primitives (unit-tested seam) |
+| `src/components/site/reveal.tsx` | ~94 | Hydration-safe reveal choreography |
+| `src/lib/content.ts` | ~206 | All site copy, icon maps, nav contracts, status labels |
+| `src/lib/auth.ts` | ~150 | scrypt + HMAC session primitives (unit-tested seam) |
 | `src/app/api/appointments/route.ts` | ~82 | Validation seam call, rate limiting, persistence |
 | `src/app/api/auth/login/route.ts` | ~130 | Credential verify, session cookie, login limiter |
-| `src/app/dashboard/page.tsx` | ~279 | Session-guarded stats + appointments table with status transitions (RSC) |
+| `src/app/dashboard/page.tsx` | ~286 | Session-guarded stats + appointments table with status transitions (RSC) |
 | `scripts/seed.ts` | ~40 | db:seed staff account upsert |
 | `src/lib/db-path.ts` | ~110 | Pure SQLite URL resolution (tested seam) |
 | `tests/e2e/mobile-navigation.spec.ts` | ~170 | Chrome contract + Tailwind v4 trap guards |
-| `tests/e2e/auth.spec.ts` | ~230 | Full auth loop incl. public-form→dashboard visibility |
-| `docs/Tailwind-V4-Validation-Report.md` | ~310 | Authoritative engine trap log |
+| `tests/e2e/auth.spec.ts` | ~263 | Full auth loop incl. public-form→dashboard visibility + browser-login key injection |
+| `docs/Tailwind-V4-Validation-Report.md` | ~334 | Authoritative engine trap log |
 | `src/app/api/appointments/[id]/route.ts` | ~134 | Staff status-transition write path (PATCH, session-guarded) |
 | `src/components/dashboard/status-button.tsx` | ~85 | Status transition client island (Confirm/Complete) |
-| `tests/e2e/appointments-status.spec.ts` | ~134 | Dashboard status loop + PATCH guard/validation pins |
+| `tests/e2e/appointments-status.spec.ts` | ~178 | Dashboard status loop + PATCH guard/validation pins (role=status pin; browser key injection) |
 | `docs/remediation-plan-session2.md` | — | Session-2 audit findings + remediation record |
 
 ---

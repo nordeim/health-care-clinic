@@ -15,9 +15,36 @@ import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from "./global-setup";
 // spec-unique: no two specs in this file share a base, and the
 // login-limiter pin below uses 198.51.100.x (which collides only with
 // appointment-form.spec's 413 key — a different route and limiter map).
+//
+// Session-18 F8: the browser-driven requests get the same per-run keys —
+// LOGIN_UI_KEY is injected via page.route on the two browser login tests
+// (4 XFF-less login POSTs per run used to land in the shared "unknown"
+// bucket vs the 10/10-min limit — a third consecutive run against a
+// reuseExistingServer instance would 429-flake), and the page.request
+// appointments POST carries APPOINTMENTS_UI_KEY explicitly (it was the
+// 6th "unknown"-bucket POST that 429-flaked run 2 of the double-run
+// repro). After this change NO request the suite makes touches the
+// "unknown" bucket, within or across runs.
 const NONOBJECT_KEY = `192.0.2.${process.pid}`;
 const ENUM_KEY = `192.0.3.${process.pid}`;
 const EMAIL_BOUND_KEY = `192.0.4.${process.pid}`;
+const APPOINTMENTS_UI_KEY = `192.0.5.${process.pid}`;
+const LOGIN_UI_KEY = `192.0.6.${process.pid}`;
+
+/** Injects the per-run XFF key on every login POST this page makes
+ * through the browser (the LoginForm island's fetch) — the request-level
+ * tests pass the header explicitly; this closes the same determinism
+ * contract for the UI-driven requests. */
+async function spoofBrowserLoginKey(page: import("@playwright/test").Page) {
+  await page.route("**/api/auth/login", (route) =>
+    route.continue({
+      headers: {
+        ...route.request().headers(),
+        "X-Forwarded-For": LOGIN_UI_KEY,
+      },
+    }),
+  );
+}
 
 test.describe("staff authentication", () => {
   test("login page renders the staff sign-in surface", async ({ page }) => {
@@ -35,6 +62,7 @@ test.describe("staff authentication", () => {
   });
 
   test("wrong credentials show a generic error and set no cookie", async ({ page }) => {
+    await spoofBrowserLoginKey(page);
     await page.goto("/login");
     await page.getByLabel("Email").fill(E2E_ADMIN_EMAIL);
     await page.getByLabel("Password").fill("definitely-not-the-password");
@@ -57,13 +85,18 @@ test.describe("staff authentication", () => {
   });
 
   test("login -> dashboard shows submitted appointments; logout revokes access", async ({ page }) => {
+    await spoofBrowserLoginKey(page);
     // Arrange: a public request lands in the scratch DB through the real API.
     // The name is unique per run — db/e2e.db persists between runs (only the
     // schema is re-pushed), and a repeated name would make the dashboard
     // assertions below ambiguous under Playwright's strict mode.
     const callerName = `Dashboard E2E Caller ${Date.now()}`;
     const callerEmail = `dashboard-e2e-${Date.now()}@example.com`;
+    // Session-18 F8: an explicit per-run key — this was the XFF-less POST
+    // that 429-flaked the second consecutive run (the 6th "unknown"-bucket
+    // request against a reused server's 5/10-min limiter window).
     const submit = await page.request.post("/api/appointments", {
+      headers: { "X-Forwarded-For": APPOINTMENTS_UI_KEY },
       data: {
         fullName: callerName,
         phone: "555-0199",

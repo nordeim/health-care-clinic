@@ -17,9 +17,33 @@ import { expect, test } from "@playwright/test";
 // and the inline limiter/413 keys use different bases entirely
 // (203.0.113.x / 198.51.100.x — the latter collides only with
 // auth.spec's LOGIN-limiter key, a different route and limiter map).
+//
+// Session-18 F8: the TWO browser-driven form submits (happy path + the
+// 422-UI test) get the same per-run treatment via page.route header
+// injection (UI_KEY) — they used to land in the shared "unknown" bucket
+// (3 XFF-less appointments POSTs per run vs the 5/10-min limit), so a
+// second consecutive run against a reuseExistingServer instance 429-flaked
+// auth.spec's POST. After this change NO request the suite makes touches
+// the "unknown" bucket, within or across runs.
 const VALIDATION_KEY = `198.51.101.${process.pid}`;
 const NONOBJECT_KEY = `198.51.102.${process.pid}`;
 const DATES_KEY = `198.51.103.${process.pid}`;
+const UI_KEY = `198.51.106.${process.pid}`;
+
+/** Injects the per-run XFF key on every appointments POST this page
+ * makes through the browser (the fetch the form itself issues) — the
+ * request-level tests pass the header explicitly; this closes the same
+ * determinism contract for the UI-driven requests. */
+async function spoofBrowserAppointmentsKey(page: import("@playwright/test").Page) {
+  await page.route("**/api/appointments", (route) =>
+    route.continue({
+      headers: {
+        ...route.request().headers(),
+        "X-Forwarded-For": UI_KEY,
+      },
+    }),
+  );
+}
 
 test.describe("appointment form", () => {
   test.beforeEach(async ({ page }) => {
@@ -40,6 +64,7 @@ test.describe("appointment form", () => {
   });
 
   test("happy path: submitting the form persists the appointment", async ({ page }) => {
+    await spoofBrowserAppointmentsKey(page);
     await page.getByLabel("Full name").fill("E2E Caller");
     await page.getByLabel("Phone number").fill("555-0100");
     await page.getByLabel("Email (optional)").fill("e2e@example.com");
@@ -117,6 +142,7 @@ test.describe("appointment form", () => {
   });
 
   test("422 field errors render per-field in the UI with aria wiring", async ({ page }) => {
+    await spoofBrowserAppointmentsKey(page);
     // "Al" passes NATIVE validation (no minlength) but fails the server's
     // 3-char floor — the exact path that used to show "check the highlighted
     // fields" with nothing highlighted (session-8 F3).

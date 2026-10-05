@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14 and 16.
-version: 2.7.0
+  12, 14, 16 and 18.
+version: 2.8.0
 last_updated: 2026-10-05
-project_state: 95 unit tests + 43 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived (structurally collision-proof)
+project_state: 95 unit tests + 43 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection (structurally collision-proof, unknown bucket never touched)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -47,7 +47,8 @@ staff `/login` + `/dashboard` pair — scrypt + HMAC cookie auth, stats
 cards, latest-100 requests table — kept **unlinked from the landing page**
 so the public experience stays byte-faithful, with `robots: noindex`.
 
-**Public surfaces:** `/` (9-section scroll narrative), `/privacy-policy`,
+**Public surfaces:** `/` (8-section scroll narrative + fixed header +
+footer), `/privacy-policy`,
 `/accessibility-statement`, `POST /api/appointments`, `GET /api/health`.
 **Staff surfaces:** `/login`, `/dashboard`, `POST /api/auth/login`,
 `POST /api/auth/logout`.
@@ -174,7 +175,8 @@ src/app/api/health/          GET — SELECT 1 probe
 src/app/login|dashboard/     staff pages (noindex, unlinked from landing)
 src/components/site/         13 components: one per landing section
                              + Reveal + LegalPage
-src/components/dashboard/    LoginForm + LogoutButton (client islands)
+src/components/dashboard/    LoginForm + LogoutButton + StatusButton
+                             (client islands)
 src/lib/content.ts           ALL copy, icon maps, nav contracts (as const)
 src/lib/auth.ts              scrypt + HMAC session primitives (pure)
 src/lib/validation.ts        appointment payload validation seam (pure)
@@ -187,8 +189,8 @@ scripts/seed.ts              db:seed staff upsert (the ONLY script — the
 
 **Client-island discipline:** Server Components by default; `"use client"`
 only for Header (menu + scroll-spy), Hero (rotating badge),
-AppointmentForm (submit states), Reveal (observer), LoginForm and
-LogoutButton. No global store — local `useState` only.
+AppointmentForm (submit states), Reveal (observer), LoginForm,
+LogoutButton and StatusButton. No global store — local `useState` only.
 
 **Header contract (pinned by e2e):** mobile dropdown is a **GRID**, not
 `space-y` (Trap #4); trigger is a real `<button>` with `aria-expanded` /
@@ -328,7 +330,7 @@ API calls surface there. API failures log structured messages
 bun run lint          # 0 errors
 bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
 bun run test          # 95/95 (db-path 15 + auth 19 + deps 4 +
-                      #  validation 27 + rate-limit 20)
+                      #  validation 27 + rate-limit 20 + status 10)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
 bun run test:e2e      # 43/43 (6 spec files)
@@ -508,7 +510,9 @@ Mobile dropdown panel paints `rgb(38 74 57 / 0.9)` (foreground @ 90%).
 ```ts
 // prisma/schema.prisma -> generated types
 Appointment { id: cuid; fullName: string; phone: string; email: string|null;
-              specialty: string; preferredDate: string|null; createdAt: Date }
+              specialty: string; preferredDate: string|null;
+              status: string (default "new"); createdAt: Date;
+              updatedAt: Date }
 AdminUser   { id: cuid; email: string (unique); passwordHash: string; createdAt: Date }
 
 // src/lib/auth.ts
@@ -528,10 +532,12 @@ navLinks: readonly { href: "#about"|…; label: string }[]
 services: readonly { icon; title; description }[]
 
 // API contracts
-POST /api/appointments  201 {ok:true,id} | 422 {error,fields} | 429 | 500
-POST /api/auth/login    200 {ok:true}+cookie | 401 {error} | 422 | 429
-POST /api/auth/logout   200 {ok:true}
-GET  /api/health        200 {ok,database} | 503
+POST /api/appointments     201 {ok:true,id} | 413 | 422 {error,fields} | 429 | 500
+PATCH /api/appointments/[id] 200 {ok,id,status}+session | 401 | 404 |
+                           413 | 422 {error,fields} | 429
+POST /api/auth/login       200 {ok:true}+cookie | 401 {error} | 422 | 429
+POST /api/auth/logout      200 {ok:true}
+GET  /api/health           200 {ok,database} | 503
 ```
 
 Bought exceptions to "no `any`": `ref as never` for the polymorphic Reveal
@@ -717,3 +723,42 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   (status UI loop + PATCH edge pins). Live parity re-verified byte-exact
   (mobile link-click 0.421875 BOTH sites; 7490px); 20 screenshots
   refreshed (dashboard shots show the status column).
+- **Session 18** (v2.8.0 — e2e unknown-bucket determinism + dashboard
+  status annunciation + full doc-claim honesty pass): the fresh-eyes audit
+  (11 findings, zero Critical/High/Medium, zero regressions) proved the
+  session-16 F2 "never poison a bucket" claim was overstated for
+  BROWSER-DRIVEN requests — the suite made 3 XFF-less appointments POSTs
+  per run into the shared "unknown" limiter bucket (limit 5/10min), so a
+  second consecutive run against a `reuseExistingServer` instance
+  429-flaked auth.spec's POST (empirically proven with a double-run
+  repro: run 1 green, run 2 failed at the 6th unknown-bucket POST). The
+  login limiter's unknown bucket took 4 browser logins per run (a third
+  consecutive run would flake at 12 > 10). Remediated TDD-first:
+  EVERY browser-driven POST/PATCH now gets its pid-derived per-run key
+  injected via `page.route` + `route.continue` header merge —
+  appointment-form UI_KEY `198.51.106.${pid}` (the two form submits),
+  auth APPOINTMENTS_UI_KEY `192.0.5.${pid}` (the page.request POST) +
+  LOGIN_UI_KEY `192.0.6.${pid}` (the two browser logins),
+  appointments-status LOGIN_UI_KEY `198.51.107.${pid}` (both browser
+  logins) + PATCH_KEY injection on the StatusButton's browser PATCHes
+  (idempotent with the API-level pins). NO request the suite makes
+  touches the "unknown" bucket anymore, within or across runs — verified
+  with a TRIPLE-consecutive-run proof: 43/43 × 3 against one persistent
+  server inside the 10-min window. The dashboard status badge gained
+  `role="status"` (implicit aria-live=polite, WCAG 4.1.3 — the
+  New→Confirmed text mutation after `router.refresh()` now announces;
+  Red-first e2e pin: `toHaveAttribute("role", "status")`). The doc pass:
+  README/CLAUDE "13 rules"→14, "41 tests"→43, the Vitest seam row
+  completed; StatusButton added to every client-island list (AGENTS,
+  CLAUDE State Management, SKILL §2/§5); SKILL body drift fixed (8
+  scroll sections, unit breakdown +status 10, Appointment type
+  +status/updatedAt, API contracts +PATCH/413); PAD §3.2 tree completed,
+  §4.1 ER gained AdminUser + status/updatedAt, §5.3 Radix claim
+  corrected (removed in S6, deps.test.ts-pinned), §5.4 CTA
+  reduced-motion wording, §6.1 APPOINTMENT_SPECIALTIES, §6.3 rewritten
+  to the ADR-008 reality (NextAuth explicitly rejected), §8.2 env table
+  completed, §9.1 +db:seed, §11 re-measured; landing.spec tel: comment
+  corrected (the third link is the FAQ's, not form-success). Unit suite
+  95 (unchanged); e2e 43 (1 extended assertion). Live parity re-verified
+  byte-exact (7490px; mobile panel 192×148 @ (178,80); link-click
+  0.421875 BOTH sites); 20 screenshots refreshed.

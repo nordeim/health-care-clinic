@@ -114,7 +114,8 @@ stays byte-faithful. All marketing copy lives in
 
 - Server Components by default; `"use client"` only for Header (menu +
   scroll-spy state), Hero (rotating badge), AppointmentForm (submit
-  states), Reveal (observer), LoginForm and LogoutButton (auth islands).
+  states), Reveal (observer), LoginForm, LogoutButton and StatusButton
+  (dashboard islands).
 - Content (copy, icon maps, nav links) lives in `src/lib/content.ts` —
   single source of truth, `as const` tuples. The appointment validation
   seam (`src/lib/validation.ts`) DERIVES its specialty allowlist from
@@ -158,8 +159,12 @@ stays byte-faithful. All marketing copy lives in
   specs run single-worker (shared SQLite file). `test:e2e` requires a prior
   `bun run build` (standalone server).
 - EVERY request-level e2e spec derives its spoofed XFF key per run
-  (module constants, spec-unique third octets) — a `reuseExistingServer`
-  instance can never poison another run's limiter bucket.
+  (module constants, spec-unique third octets), AND every browser-driven
+  POST/PATCH gets its per-run key injected via `page.route`
+  (`route.continue` header merge — session-18 F8) — no request the suite
+  makes touches the shared "unknown" limiter bucket, so a
+  `reuseExistingServer` instance can never poison another run's bucket,
+  within or across runs.
 - The appointment happy-path test deliberately does NOT assert the
   in-flight "Sending…" state — it races a fast local API.
 - Headless hover checks are unreliable: v4 wraps `hover:` variants in

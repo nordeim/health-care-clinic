@@ -155,7 +155,7 @@ test.describe("landing page", () => {
     const telHrefs = await page.locator("a[href^='tel:']").evaluateAll(
       (links) => links.map((link) => link.getAttribute("href")),
     );
-    expect(telHrefs.length).toBeGreaterThanOrEqual(3); // contact + footer + form-success context
+    expect(telHrefs.length).toBeGreaterThanOrEqual(3); // contact + footer + FAQ context (session-18 F9 comment fix — the form-success state never renders in this spec)
     for (const href of telHrefs) {
       expect(href).toBe("tel:+11234567890");
     }
