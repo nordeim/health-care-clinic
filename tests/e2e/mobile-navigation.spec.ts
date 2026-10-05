@@ -59,6 +59,12 @@ test.describe("mobile navigation", () => {
         const canvas = document.createElement("canvas");
         canvas.width = 1;
         canvas.height = 1;
+        // Bought exception (session-16 F3): getContext returns null only for
+        // an unsupported contextType — "2d" is supported in every browser
+        // Playwright drives, and the e2e suite fails loudly long before a
+        // null-deref could mask a trap regression. The rule stays ON
+        // everywhere else.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const ctx = canvas.getContext("2d")!;
         ctx.fillStyle = getComputedStyle(el).backgroundColor;
         ctx.fillRect(0, 0, 1, 1);

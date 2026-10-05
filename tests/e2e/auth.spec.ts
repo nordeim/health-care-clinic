@@ -5,17 +5,19 @@ import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from "./global-setup";
 // The full loop: a public appointment submission becomes visible on the
 // authenticated dashboard (form -> API -> SQLite -> dashboard).
 
-// Per-run XFF keys (session-14 F2 — the session-10 F6 doctrine extended
-// from the limiter specs to EVERY request-level spec): each key derives its
-// fourth octet from the run timestamp and its third octet is spec-unique,
-// so no two specs share a limiter bucket — neither within one run (even
-// when two constants are evaluated in the same millisecond at file load)
-// nor across runs against a reused reuseExistingServer instance on :3100.
-// The 192.0.2.x base (TEST-NET-1) is disjoint from every other key in this
-// file, including the login-limiter pin's 198.51.100.x.
-const NONOBJECT_KEY = `192.0.2.${(Date.now() % 200) + 10}`;
-const ENUM_KEY = `192.0.3.${(Date.now() % 200) + 10}`;
-const EMAIL_BOUND_KEY = `192.0.4.${(Date.now() % 200) + 10}`;
+// Per-run XFF keys (session-16 F2 hardening of the session-14 F2 scheme):
+// the fourth segment is the playwright PROCESS PID — every run is a new
+// process, and pid recycling requires a full pid_max wrap, so the
+// discriminator is structurally unique per run (the previous
+// `Date.now() % 200` scheme retained a ~1/200 back-to-back collision).
+// The value is not a valid IPv4 octet above 255 — the limiter keys on the
+// raw XFF token, which requires no IPv4 syntax. Third octets are
+// spec-unique: no two specs in this file share a base, and the
+// login-limiter pin below uses 198.51.100.x (which collides only with
+// appointment-form.spec's 413 key — a different route and limiter map).
+const NONOBJECT_KEY = `192.0.2.${process.pid}`;
+const ENUM_KEY = `192.0.3.${process.pid}`;
+const EMAIL_BOUND_KEY = `192.0.4.${process.pid}`;
 
 test.describe("staff authentication", () => {
   test("login page renders the staff sign-in surface", async ({ page }) => {
@@ -175,11 +177,12 @@ test.describe("staff authentication", () => {
     // Session-12 T4: the login limiter (10 attempts / 10 min / key, keyed on
     // the LAST X-Forwarded-For token) had no route-level pin — only the
     // appointments limiter (5 / 10 min) was e2e-pinned. The spoofed XFF key
-    // is derived per run (session-10 F6 pattern) so a reused
-    // reuseExistingServer instance on :3100 can never poison the bucket.
-    // The 198.51.100.x range (TEST-NET-2) is disjoint from every fixed
-    // 203.0.113.x key in this file — no cross-spec collision is possible.
-    const headers = { "X-Forwarded-For": `198.51.100.${(Date.now() % 200) + 10}` };
+    // is derived per run from the process pid (session-10 F6 pattern;
+    // session-16 F2 — structurally unique, no cross-run collision) so a
+    // reused reuseExistingServer instance on :3100 can never poison the
+    // bucket. The 198.51.100.x range (TEST-NET-2) is disjoint from every
+    // other key in this file.
+    const headers = { "X-Forwarded-For": `198.51.100.${process.pid}` };
     const payload = {
       email: E2E_ADMIN_EMAIL,
       password: "definitely-not-the-password",

@@ -60,9 +60,12 @@ reference has no login — its route table is `/`, `/privacy-policy`,
   the landing page; session-guarded)
 - `src/components/site/` — one component per landing section + `Reveal`
   choreography helper + `LegalPage` shell
-- `src/components/dashboard/` — `LoginForm`, `LogoutButton` client islands
-- `src/lib/` — `content.ts` (all copy/icon maps), `auth.ts` (scrypt +
-  HMAC session primitives), `db.ts`, `db-path.ts`
+- `src/components/dashboard/` — `LoginForm`, `LogoutButton`, `StatusButton`
+  client islands
+- `src/lib/` — `content.ts` (all copy/icon maps + status labels), `auth.ts`
+  (scrypt + HMAC session primitives), `validation.ts` (appointment + status
+  seams), `rate-limit.ts` (XFF keying, limiter, body cap), `motion.ts`
+  (reduced-motion scroll behavior), `db.ts`, `db-path.ts`
 - `prisma/` — schema (Appointment + AdminUser models)
 - `scripts/seed.ts` — `db:seed` staff account upsert
 - `tests/e2e/` — Playwright specs; `tests/*.test.ts` — Vitest seams
@@ -89,6 +92,9 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 - `POST /api/auth/login` / `POST /api/auth/logout` — same validation
   doctrine; generic 401 (no user enumeration); login limiter 10 / 10 min /
   IP; httpOnly SameSite=Lax session cookie signed with `AUTH_SECRET`.
+- `PATCH /api/appointments/[id]` — the dashboard's status-transition write
+  path (session-guarded; status allowlist derived from content.ts; limiter
+  60 / 10 min / IP; 64 KiB body cap; 404 unknown ids).
 - `GET /api/health` — `SELECT 1` probe; 503 when down.
 
 ## Development Workflow
@@ -108,7 +114,7 @@ bun run test:e2e                  # requires the build above
 Env determinism: the `dev`/`build`/`db:*` scripts strip ambient
 `DATABASE_URL` (`env -u`) so the repo `.env` is authoritative; production
 `start` keeps ambient env (DEPLOYMENT.md §4). Dotenv gotcha: escape a
-leading `$` in values (`\$Abcd1234`) or interpolation silently empties it.
+leading `$` in values (`\$up3rS3cretPass`) or interpolation silently empties it.
 
 Read `dev.log` (tail) after any dev-server work — hydration errors and
 failed API calls surface there. `AGENTS.md` holds the condensed
@@ -131,8 +137,11 @@ non-obvious-rules list; this file holds the reasoning.
   (`tests/rate-limit.test.ts`, 20 cases: last-token XFF keying, window
   expiry, max boundary, the stream-read 64 KiB body cap including the
   chunked/no-content-length shape and the exact boundary, transport-error
-  tolerance, the bodyless-request pin).
-- **E2E (Playwright):** five spec files — `mobile-navigation` (the
+  tolerance, the bodyless-request pin), and the status-update seam
+  (`tests/status.test.ts`, 10 cases: allowlist derived from content.ts,
+  case-sensitivity, present-but-non-string rejection, non-object body
+  tolerance, missing-status requirement).
+- **E2E (Playwright):** six spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
   reduced-motion instant-jump pin, baseline security-header pin),
@@ -141,7 +150,9 @@ non-obvious-rules list; this file holds the reasoning.
   transport-failure message + health), `legal-pages`, `auth` (login
   page, wrong credentials, session cookie contract incl. sameSite/Secure,
   dashboard guard, logout, full public-form→dashboard loop, enumeration
-  parity, non-object body tolerance, login email-length bound). Single
+  parity, non-object body tolerance, login email-length bound), and
+  `appointments-status` (the dashboard New→Confirmed→Completed loop via
+  the real UI + PATCH guard/validation/404 pins). Single
   worker, shared scratch DB (`db/e2e.db`), standalone server on :3100;
   EVERY request-level spec derives its spoofed XFF key per run
   (module constants with spec-unique third octets — a reused server can
@@ -224,7 +235,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 13
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  85/85 unit, build OK, 41/41 e2e).
+  95/95 unit, build OK, 43/43 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

@@ -192,3 +192,15 @@ export const footerContact = {
   phone: "123-456-7890",
   phoneHref: "tel:+11234567890",
 } as const;
+
+/* Appointment workflow states (session-16 G1 — the dashboard's status
+ * transitions). Extension surface: the reference has no dashboard, so this
+ * copy has no reference counterpart. The stored VALUE is what the API
+ * allowlist and the Prisma column share; the LABEL is what the dashboard
+ * badge renders. Single source of truth — never hand-copied (the same
+ * doctrine as the services list driving APPOINTMENT_SPECIALTIES). */
+export const appointmentStatuses = [
+  { value: "new", label: "New" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "completed", label: "Completed" },
+] as const;

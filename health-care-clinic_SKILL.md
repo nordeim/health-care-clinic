@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12 and 14.
-version: 2.6.0
+  12, 14 and 16.
+version: 2.7.0
 last_updated: 2026-10-05
-project_state: 85 unit tests + 41 e2e tests green; HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on both POST routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every response (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed); env-leak guard active (env -u); lint gate honest (13 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded)
+project_state: 95 unit tests + 43 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived (structurally collision-proof)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -291,7 +291,7 @@ Plus the environment/process traps (both bit this project for real):
 7. **Ambient env beats dotenv:** an exported `DATABASE_URL` shadows the
    repo `.env`; writes silently land outside the repo. Mitigation:
    `env -u DATABASE_URL` on dev/build/db scripts (ADR-010).
-8. **dotenv `$` interpolation:** `ADMIN_PASSWORD="$Abcd1234"` resolves to
+8. **dotenv `$` interpolation:** `ADMIN_PASSWORD="$up3rS3cretPass"` resolves to
    `""` — the seed failed on this exact value. Mitigation: escape `\$`.
 9. **Important-modifier syntax moved:** v3 `!text-sm` → v4 suffix
    `text-sm!`.
@@ -327,11 +327,11 @@ API calls surface there. API failures log structured messages
 ```bash
 bun run lint          # 0 errors
 bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
-bun run test          # 85/85 (db-path 15 + auth 19 + deps 4 +
+bun run test          # 95/95 (db-path 15 + auth 19 + deps 4 +
                       #  validation 27 + rate-limit 20)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
-bun run test:e2e      # 41/41 (5 spec files)
+bun run test:e2e      # 43/43 (6 spec files)
 ```
 
 Manual smoke: mobile menu open → link click (closes + jumps) → Escape
@@ -686,3 +686,34 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   Live parity re-verified byte-exact (mobile link-click 0.421875 BOTH
   sites; 7490px); 20 screenshots refreshed (03-desktop-full exactly
   1440×7490).
+- **Session 16** (status management + e2e key determinism + lint-gate
+  strengthening + doc-claim honesty): closed the last backlog item —
+  appointment status transitions. The Appointment model gained
+  `status` (allowlisted string, default "new") + `updatedAt`
+  (`@default(now()) @updatedAt` so `prisma db push` is data-preserving);
+  a session-guarded `PATCH /api/appointments/[id]` (limiter 60/10 min,
+  readJsonBody cap, 404 unknown ids, value-validated through a NEW pure
+  seam `validateStatusUpdate` whose allowlist is DERIVED from content.ts
+  `appointmentStatuses` — the same one-source doctrine as
+  APPOINTMENT_SPECIALTIES); the dashboard table gained a Status column
+  (badges + a StatusButton client island that PATCHes then
+  `router.refresh()`es — server state stays the source of truth, and the
+  brief re-enabled window before the refresh lands is benign because the
+  PATCH is idempotent). Hardening residuals: the per-run XFF keys moved
+  from `Date.now() % 200` (a ~1/200 back-to-back collision — the comment
+  overclaimed "collision-proof") to the raw `process.pid` as the fourth
+  dot-segment (every run is a new process; pid recycling needs a full
+  pid_max wrap; the limiter keys on the raw XFF token so non-IPv4
+  segments are legal); `no-non-null-assertion` re-enabled (the old
+  rationale cited reveal.tsx which contains NO assertion — the single
+  canvas.getContext exception is inline-disabled; 14 rules ON now);
+  Next's internal 308 trailing-slash redirect carries NO security headers
+  (headers() applies only from route matching onward — docs corrected to
+  "every route response and app-level redirect", both edges e2e-pinned);
+  dev/start `tee` pipes mask exit codes (documented — judge liveness by
+  /api/health + log tails); the live staff password was neutralized out
+  of the four living docs (history scrubbing skipped — never rewrite
+  pushed main). Unit suite 85 → 95 (status seam, 10 cases); e2e 41 → 43
+  (status UI loop + PATCH edge pins). Live parity re-verified byte-exact
+  (mobile link-click 0.421875 BOTH sites; 7490px); 20 screenshots
+  refreshed (dashboard shots show the status column).

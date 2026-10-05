@@ -3,20 +3,23 @@ import { expect, test } from "@playwright/test";
 // Appointment request funnel — the landing page's only write path.
 // Drives the real form against the real API + SQLite (db/e2e.db).
 
-// Per-run XFF keys (session-14 F2 — the session-10 F6 doctrine extended
-// from the limiter/413 specs to EVERY request-level spec): each key derives
-// its fourth octet from the run timestamp and its third octet is
-// spec-unique, so no two specs share a limiter bucket — neither within one
-// run (even when two constants are evaluated in the same millisecond at
-// file load) nor across runs against a reused reuseExistingServer instance
-// on :3100. Previously the impossible-dates spec sent 3 requests under the
-// FIXED key 203.0.113.2 — a second suite run within 10 minutes pushed that
-// bucket to 6 and the 422 assertions failed with a 429. The 198.51.10x
-// bases are disjoint from the 429/413 specs' inline per-run keys
-// (203.0.113.x / 198.51.100.x).
-const VALIDATION_KEY = `198.51.101.${(Date.now() % 200) + 10}`;
-const NONOBJECT_KEY = `198.51.102.${(Date.now() % 200) + 10}`;
-const DATES_KEY = `198.51.103.${(Date.now() % 200) + 10}`;
+// Per-run XFF keys (session-16 F2 hardening of the session-14 F2 scheme —
+// the session-10 F6 doctrine extended to EVERY request-level spec): the
+// fourth segment is the playwright PROCESS PID. Every run is a new
+// process, and pid recycling requires a full pid_max wrap, so the
+// discriminator is structurally unique per run — the previous
+// `Date.now() % 200` scheme retained a ~1/200 back-to-back collision
+// (two runs whose module-eval timestamps differ by a multiple of 200 ms
+// derived IDENTICAL keys inside the 10-min limiter window under
+// reuseExistingServer). The value is not a valid IPv4 octet above 255 —
+// the limiter keys on the raw XFF token, which requires no IPv4 syntax.
+// Third octets are spec-unique: no two specs in this file share a base,
+// and the inline limiter/413 keys use different bases entirely
+// (203.0.113.x / 198.51.100.x — the latter collides only with
+// auth.spec's LOGIN-limiter key, a different route and limiter map).
+const VALIDATION_KEY = `198.51.101.${process.pid}`;
+const NONOBJECT_KEY = `198.51.102.${process.pid}`;
+const DATES_KEY = `198.51.103.${process.pid}`;
 
 test.describe("appointment form", () => {
   test.beforeEach(async ({ page }) => {
@@ -144,12 +147,12 @@ test.describe("appointment form", () => {
     // uses (session-8 F2). The five persisted probe rows are inert — no
     // spec asserts the "Limiter Probe" name with a strict locator.
     //
-    // The key is UNIQUE PER RUN (session-10 F6): the standalone server's
-    // limiter state is in-memory, and with `reuseExistingServer` an
-    // operator-left server on :3100 would carry the previous run's bucket
-    // for a fixed key — the first POST would 429 and the 201 assertion
-    // below would fail. A per-run key makes the bucket provably fresh.
-    const headers = { "X-Forwarded-For": `203.0.113.${(Date.now() % 200) + 10}` };
+    // The key is UNIQUE PER RUN (session-10 F6; session-16 F2 — pid-derived,
+    // structurally unique): the standalone server's limiter state is
+    // in-memory, and with `reuseExistingServer` an operator-left server on
+    // :3100 would carry the previous run's bucket for a fixed key — the
+    // first POST would 429 and the 201 assertion below would fail.
+    const headers = { "X-Forwarded-For": `203.0.113.${process.pid}` };
     for (let i = 0; i < 5; i += 1) {
       const response = await request.post("/api/appointments", {
         headers,
@@ -165,12 +168,11 @@ test.describe("appointment form", () => {
   });
 
   test("oversized bodies are rejected with 413 before parsing", async ({ request }) => {
-    // Per-run key (session-10 F6): the 413 check runs after the limiter
-    // counts the request, so a leftover server's bucket for a fixed key
-    // could turn this into a 429. A fresh key keeps the assertion about
-    // the body cap.
+    // Per-run key (session-10 F6; session-16 F2 — pid-derived): the 413
+    // check runs after the limiter counts the request, so a leftover
+    // server's bucket for a fixed key could turn this into a 429.
     const response = await request.post("/api/appointments", {
-      headers: { "X-Forwarded-For": `198.51.100.${(Date.now() % 200) + 10}` },
+      headers: { "X-Forwarded-For": `198.51.100.${process.pid}` },
       data: { fullName: "x".repeat(70 * 1024), phone: "555-0197", specialty: "Primary Care" },
     });
     expect(response.status()).toBe(413);

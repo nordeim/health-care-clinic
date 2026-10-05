@@ -9,10 +9,15 @@ Every line answers: "would an agent likely miss this without help?"
 | ---- | ------- |
 | Install | `bun install` (then `bun pm trust --all` if postinstalls were blocked) |
 | Dev server | `bun run dev` → http://localhost:3000 (writes `dev.log`) |
-| Lint | `bun run lint` (13 correctness rules ON; every off documented in the config — session-12 F3) |
+
+NOTE (session-16 F4): `dev`/`start` pipe through `tee` — the script's exit
+code is tee's, NOT the server's. Liveness is judged by `/api/health` and
+the log tails, never by the wrapper's exit status.
+
+| Lint | `bun run lint` (14 correctness rules ON; every off documented in the config — session-12 F3, session-16 F3) |
 | Typecheck | `bun run typecheck` |
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
-| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 41 tests) |
+| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 43 tests) |
 | DB schema | `bun run db:push` (Prisma; SQLite at `db/custom.db`) |
 | Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) |
 | Production | `bun run build && bun .next/standalone/server.js` |
@@ -101,7 +106,7 @@ stays byte-faithful. All marketing copy lives in
    Server Component (redirect to `/login`); no middleware exists — don't
    add one without updating the ADR log.
 10. **dotenv `$` interpolation gotcha:** a value starting with `$` in `.env`
-    (e.g. `ADMIN_PASSWORD="$Abcd1234"`) resolves to `""` — escape it as
+    (e.g. `ADMIN_PASSWORD="$up3rS3cretPass"`) resolves to `""` — escape it as
     `\$`. This bit the seed script once; the troubleshooting table in
     README records it.
 

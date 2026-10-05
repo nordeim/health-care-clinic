@@ -1,4 +1,4 @@
-import { services } from "@/lib/content";
+import { appointmentStatuses, services } from "@/lib/content";
 
 /* ---------------------------------------------------------------------------
  * Appointment payload validation — the PURE seam behind
@@ -42,6 +42,13 @@ export const APPOINTMENT_SPECIALTIES: ReadonlySet<string> = new Set([
   "Primary Care",
   ...services.map((service) => service.title),
 ]);
+
+/** The appointment status values the PATCH route accepts — derived from the
+ * same content.ts list the dashboard badges render (session-16 G1), so the
+ * API's allowlist can never drift from the UI's state space. */
+export const APPOINTMENT_STATUSES: ReadonlySet<string> = new Set(
+  appointmentStatuses.map((status) => status.value),
+);
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 /** Shared email sanity pattern — exported so the login route validates with
@@ -190,4 +197,36 @@ export function upcomingVisitsFloor(now: Date = new Date()): string {
   const m = String(floor.getMonth() + 1).padStart(2, "0");
   const d = String(floor.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+export type StatusUpdateValidation =
+  | { ok: true; value: string }
+  | { ok: false; fields: Record<string, string> };
+
+/** Validates the body of PATCH /api/appointments/[id] (session-16 G1 —
+ * the dashboard's status-transition write path). Same doctrine as the
+ * appointment payload seam: tolerate ANY JSON body shape (null, scalars,
+ * arrays degrade to a 422 field map), type-tighten present-but-non-string
+ * values (session-12 F7), and allowlist the value against the content.ts
+ * state space. Deliberately does NOT enforce the UI's transition graph
+ * (new -> confirmed -> completed): the staff-only surface may jump states
+ * (e.g. directly completing a walk-in) — every transition stamps
+ * updatedAt, so the audit trail survives. */
+export function validateStatusUpdate(payload: unknown): StatusUpdateValidation {
+  const record: Record<string, unknown> =
+    typeof payload === "object" && payload !== null && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {};
+
+  if (record.status === undefined || record.status === null) {
+    return { ok: false, fields: { status: "Status is required." } };
+  }
+  if (typeof record.status !== "string") {
+    return { ok: false, fields: { status: "Choose a status from the list." } };
+  }
+  const status = record.status.trim();
+  if (!APPOINTMENT_STATUSES.has(status)) {
+    return { ok: false, fields: { status: "Choose a status from the list." } };
+  }
+  return { ok: true, value: status };
 }

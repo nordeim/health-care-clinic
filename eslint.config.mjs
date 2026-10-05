@@ -22,6 +22,11 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
       "error",
       { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
     ],
+    // Session-16 F3: re-enabled after the audit proved the old rationale
+    // stale (reveal.tsx has NO non-null assertion — it uses `ref as never`).
+    // The single bought exception lives inline in mobile-navigation.spec.ts
+    // (canvas.getContext("2d") — genuinely optional per the DOM API).
+    "@typescript-eslint/no-non-null-assertion": "error",
 
     // ---- React hooks: ON (verified 0 findings — effect hygiene was
     // manually re-audited in sessions 8, 10 and 12) ----------------------
@@ -54,7 +59,6 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     // False positives on TYPE-ONLY globals (RequestInit, ScrollBehavior,
     // ReadableStream in .ts files): no-undef does not understand TS types;
     // typescript-eslint's own guidance is to disable it for TS code.
-    "@typescript-eslint/no-non-null-assertion": "off", // bought exception sites are review-pinned (reveal.tsx)
     "no-undef": "off",
 
     // Parity doctrine: the reference ports <img> with intrinsic sizes and

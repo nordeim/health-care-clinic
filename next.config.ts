@@ -25,7 +25,10 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Session-14 F3: stop advertising the framework (X-Powered-By header).
   poweredByHeader: false,
-  // Session-14 F3: baseline security headers on EVERY route. Response
+  // Session-14 F3: baseline security headers on every route RESPONSE and
+  // app-level redirect (session-16 F1 wording fix: Next's internal 308
+  // trailing-slash normalization is emitted BEFORE headers() applies and
+  // carries none of the set — documented limitation, e2e-pinned).
   // headers are invisible to rendering — parity is untouched (the e2e
   // header pin lives in landing.spec.ts). Each is safe for this app:
   //  - nosniff: no MIME confusion consumers exist, but it is free defense.

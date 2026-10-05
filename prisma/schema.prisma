@@ -21,8 +21,18 @@ model Appointment {
   email         String?
   specialty     String
   preferredDate String?
+  // Workflow state (session-16 G1): "new" -> "confirmed" -> "completed" as
+  // rendered by the dashboard badges; the value space lives in
+  // src/lib/content.ts (appointmentStatuses) and the API allowlist is
+  // DERIVED from it (src/lib/validation.ts APPOINTMENT_STATUSES). SQLite
+  // has no native enums — an allowlisted String column is the doctrine.
+  status        String   @default("new")
   // Simple abuse signal: createdAt is exposed only to the API layer.
   createdAt     DateTime @default(now())
+  // Stamped on every status transition (Prisma @updatedAt) — the audit
+  // trail for PATCH /api/appointments/[id]. Defaults to now() so
+  // `prisma db push` is data-preserving for pre-existing rows.
+  updatedAt     DateTime @default(now()) @updatedAt
 
   @@index([createdAt])
   @@map("appointments")

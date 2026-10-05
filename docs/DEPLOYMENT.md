@@ -33,8 +33,11 @@ the staff password after copying, and never distribute the folder.
 
 Baseline security headers (`X-Content-Type-Options: nosniff`,
 `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`)
-are applied by `next.config.ts` on every route since session 14, and
-`X-Powered-By` is suppressed. A full CSP belongs at the reverse-proxy
+are applied by `next.config.ts` to every route response and app-level
+redirect since session 14, and `X-Powered-By` is suppressed. (Known
+limitation, e2e-pinned: the framework's INTERNAL 308 trailing-slash
+normalization is emitted before `headers()` applies and carries none of
+the set — an empty-body redirect with ~nil exposure.) A full CSP belongs at the reverse-proxy
 seam (see §6) — the reveal self-heal inline `<script>` would need a hash
 or nonce to survive a script-src restriction.
 

@@ -21,6 +21,7 @@
 - `[S10]` Session-10 edge closure + robustness (see `docs/remediation-plan-session10.md`): the fresh-eyes audit found what session 8's own hardening had left half-open — `POST /api/auth/login` 500'd on a JSON `null` body (property access outside the parse try/catch), the 64 KiB body cap trusted only `content-length` so CHUNKED requests bypassed it entirely (verified live: a 70 KiB chunked POST buffered and parsed), and `scryptSync` blocked the event loop ~30-50 ms per login attempt (spoofed-key bursts starved every concurrent request). Remediated TDD-first: `readJsonBody` seam in `rate-limit.ts` (stream-read with the hard byte cap for every transport shape, socket cancelled on breach), the login non-object-body guard (422 field map, e2e-pinned on both routes), `promisify(scrypt)` (identical CPU on the libuv threadpool — DUMMY_HASH and the timing-equalization contract untouched; verified live: health polls interleave during concurrent scrypt logins), a one-day west-of-server timezone tolerance on the not-in-the-past floor, `src/lib/motion.ts` `scrollBehavior()` for reduced-motion instant jumps in both CTA handlers, and per-run spoofed XFF keys in the limiter e2e specs (a `reuseExistingServer` instance can no longer poison buckets). Unit suite 65 → 76; e2e 34 → 37; live parity re-verified byte-exact (mobile link-click identical to the pixel, same session, same method); product loop green under the still-active ambient hijack; 11 screenshots refreshed.
 - `[S12]` Session-12 email bound + transport tolerance + lint-gate honesty (see `docs/remediation-plan-session12.md`): the fresh-eyes audit found the email field was the only UNBOUNDED payload field (a pattern-valid 60,012-char email persisted — verified live), transport read errors escaped `readJsonBody` and both routes' try/catch as unhandled framework errors (ECONNRESET verified live via a raw-socket mid-body abort), the "lint 0" gate ran with ~24 rules silently disabled, plus: logout fetch without a catch, `reactStrictMode` off without recorded rationale, the "Upcoming visits" stat stricter than the validation tolerance, a non-string `specialty` silently coercing to the default (`{"specialty":42}` → 201 "Primary Care"), seed's dead-code disconnect, and the login route's hand-copied email regex. Remediated TDD-first: `EMAIL_MAX_LENGTH = 254` (255 → 422, 254 → 201, boundary live-probed), the read loop wrapped so transport failures cancel and degrade to 400 (routes always resolve now), specialty type tightening (present-but-non-string → 422; missing/nullish keep the default), `upcomingVisitsFloor()` sharing `toleranceFloorDate()` with the preferredDate validation (stat and API can never disagree), logout `.catch`, seed `process.exitCode`, login importing the seam's `EMAIL_PATTERN`, and a rewritten `eslint.config.mjs` — 13 correctness/dep-safety rules ON at 0 findings, every remaining off documented (no-undef: TS type-only globals; no-img-element: parity `<img>` ports). The three root-href `no-html-link-for-pages` hits converted to `next/link`. New login-limiter e2e pin (10 × 401 then 429 under a per-run 198.51.100.x spoofed key). Unit suite 76 → 85; e2e 37 → 38; live parity re-verified byte-exact (7490px; mobile link-click 0.421875 both sites); 20 screenshots refreshed.
 - `[S14]` Session-14 footer completion + e2e cross-run keys + security headers + login email bound + transport-message curation (see `docs/remediation-plan-session14.md`): the fresh-eyes audit surfaced the residuals five prior audits missed — the two FOOTER legal links still plain `<a>` (and the discovery that `no-html-link-for-pages` is structurally blind to non-root App-Router routes: href normalization appends a trailing slash the route regexes lack, so only root-href anchors can ever match — the rule's blind spot is now recorded in the eslint config and audits must grep for page-href anchors manually), the impossible-dates e2e spec posting 3 requests under a FIXED XFF key (cross-run 429 flake — the session-10 F6 per-run-key doctrine is now applied to EVERY request-level spec via module constants with spec-unique third octets), zero standard security headers with `X-Powered-By` exposed (`next.config.ts` now applies nosniff / X-Frame-Options DENY / Referrer-Policy to every route and suppresses X-Powered-By — e2e-pinned, rendering-invisible so parity untouched; full CSP documented as the reverse-proxy seam's job), `next build` embedding a byte-identical `.env` (staff password + AUTH_SECRET) into `.next/standalone/.env` (DEPLOYMENT.md now warns: strip or rotate), the login email without the 254 bound the appointments route enforces (login now imports `EMAIL_MAX_LENGTH` — one seam, one bound; 300-char email → 422, no new oracle), a stale dev-PII query-log comment (corrected to Prisma 6.11 reality: SQL templates with `?` placeholders only, bound values NOT printed), and raw "Failed to fetch" engine strings surfacing in both forms (TypeError now curated; e2e-pinned via `page.route().abort()`). Unit suite 85 (unchanged); e2e 38 → 41 (login email bound, security headers, transport-failure message — all TDD Red-first); live parity re-verified byte-exact (7490px; mobile link-click 0.421875 both sites); 20 screenshots refreshed (03-desktop-full exactly 1440×7490).
+- `[S16]` Session-16 status management + e2e key determinism + lint-gate strengthening + doc-claim honesty (see `docs/remediation-plan-session16.md`): the fresh-eyes audit found the residuals six prior audits missed — framework-generated 308 trailing-slash redirects carry no security headers while the docs claimed "every route/response" (wording corrected everywhere; both edges — the covered 307 and the bare 308 — are now e2e-pinned), the per-run XFF keys had a ~1/200 back-to-back collision (Date.now() % 200 — replaced by the structurally-unique process pid as the key discriminator), a stale eslint rationale kept `no-non-null-assertion` off (re-enabled; the single DOM-canvas exception is inline-disabled; the gate is now 14 correctness rules ON), the dev/start `tee` pipes mask server exit codes (documented in AGENTS.md), the live staff password appeared verbatim in four living docs as the dotenv-escaping example (neutralized to a placeholder; history scrubbing deliberately skipped — never rewrite pushed main), and PAD §11 line counts plus the README/CLAUDE file inventories had drifted (all re-measured and completed). The session also CLOSED the last documented backlog item: appointment status management — the Appointment model gains `status` (allowlisted string, default "new") + `updatedAt`; a session-guarded, rate-limited (60/10min), body-capped `PATCH /api/appointments/[id]` validates through a new pure seam (`validateStatusUpdate`, allowlist DERIVED from content.ts `appointmentStatuses` — one source of truth for API + UI); the dashboard table gains a Status column (badges + Confirm/Complete client island that PATCHes and `router.refresh()`es). Unit suite 85 → 95 (status seam, 10 cases); e2e 41 → 43 (the UI status loop + PATCH edge pins); live parity re-verified byte-exact (7490px; mobile panel 192x148 @ (178,80); link-click 0.421875 both sites); 20 screenshots refreshed (03-desktop-full exactly 1440x7490; dashboard shots show the status column).
 
 ---
 
@@ -263,7 +264,7 @@ flowchart TB
     subgraph App[Next.js 16 standalone server]
         RSC[Static pages<br/>/ /privacy-policy /accessibility-statement /login]
         DASH[Session-guarded RSC<br/>GET /dashboard]
-        API[Dynamic route handlers<br/>POST /api/appointments<br/>GET /api/health<br/>POST /api/auth/login /logout]
+        API[Dynamic route handlers<br/>POST /api/appointments<br/>PATCH /api/appointments/[id]<br/>GET /api/health<br/>POST /api/auth/login /logout]
     end
     subgraph Data
         P[Prisma Client singleton]
@@ -614,12 +615,13 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 
 | Category | Files | Tests | Location | Framework |
 | -------- | ----- | ----- | -------- | --------- |
-| Unit (pure seams) | 5 | 85 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin) | Vitest |
+| Unit (pure seams) | 6 | 95 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin), `tests/status.test.ts` (10: allowlist derivation, case-sensitivity, type tightening, non-object tolerance) | Vitest |
 | E2E chrome contract | 1 | 7 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
 | E2E landing parity | 1 | 12 | `tests/e2e/landing.spec.ts` (incl. title + tel: pins, reduced-motion instant-jump pin, baseline security-header pin) | Playwright |
 | E2E write path | 1 | 10 | `tests/e2e/appointment-form.spec.ts` (incl. 422 UI, 429, 413, impossible dates, non-object body, curated transport-failure message) | Playwright |
 | E2E legal pages | 1 | 3 | `tests/e2e/legal-pages.spec.ts` (incl. title pins) | Playwright |
 | E2E auth loop | 1 | 9 | `tests/e2e/auth.spec.ts` (incl. enumeration parity, cookie flags, non-object body, login-limiter 429 pin, login email-length bound pin) | Playwright |
+| E2E status management | 1 | 2 | `tests/e2e/appointments-status.spec.ts` (dashboard New→Confirmed→Completed UI loop + PATCH 401/422/404/200 pins) | Playwright |
 
 ### 7.2 Test Patterns
 
@@ -633,16 +635,16 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 ### 7.3 Coverage Thresholds
 
 No numeric threshold configured (content-rendering app; the meaningful
-coverage is the parity surface). The gate is pass/fail: 85/85 unit,
-41/41 e2e.
+coverage is the parity surface). The gate is pass/fail: 95/95 unit,
+43/43 e2e.
 
 ### 7.4 Pre-Push Checklist
 
-- [ ] `bun run lint` — 0 errors (strengthened ruleset: 13 correctness rules ON, documented offs only — session-12 F3)
+- [ ] `bun run lint` — 0 errors (strengthened ruleset: 14 correctness rules ON, documented offs only — session-12 F3 + session-16 F3)
 - [ ] `bun run typecheck` — clean (true strict)
-- [ ] `bun run test` — 85/85 (db-path 15 + auth 19 + deps 4 + validation 27 + rate-limit 20)
+- [ ] `bun run test` — 95/95 (db-path 15 + auth 19 + deps 4 + validation 27 + rate-limit 20 + status 10)
 - [ ] `bun run build` — standalone output produced (types enforced — no ignoreBuildErrors)
-- [ ] `bun run test:e2e` — 41/41 (requires the build)
+- [ ] `bun run test:e2e` — 43/43 (requires the build)
 - [ ] `git status` clean of secrets/artifacts before commit
 
 ---
@@ -725,7 +727,7 @@ bun run dev            # verify: curl localhost:3000/api/health
 | LOW | Rate limiter is per-process memory | resets on restart; wrong under horizontal scaling (not the deployment shape) | Documented in §6 |
 | LOW | Rate-limit key trust boundary | direct exposure (no proxy) can still be spoofed via fabricated XFF — App Router route handlers cannot read the socket address; the limiter keys on the LAST (proxy-appended) XFF token, correct behind both proxy styles | Documented in DEPLOYMENT.md §6 — run behind the mandated proxy |
 | LOW | `braces` + `deepmerge-ts` dev-chain advisories | dev-time only (eslint/prisma tooling); no runtime exposure | Accepted — awaiting upstream fixes |
-| LOW | Dashboard is read-only (no status transitions on appointments) | staff can review but not mark confirmed/done | Backlog — natural next feature |
+| LOW | ~~Dashboard is read-only (no status transitions)~~ | CLOSED in session 16: PATCH `/api/appointments/[id]` + status column (New → Confirmed → Completed), TDD-covered | Closed (session-16 G1) |
 | LOW | No skip-to-content link (WCAG 2.4.1) | keyboard users tab through the fixed header on every page | Reference-shared limitation — the reference has no skip link either (probed session 8); parity doctrine keeps it out |
 | INFO | ±1/255 oklab quantization drift on opacity-modified colors | imperceptible; asserted with tolerance in e2e | Accepted (ADR-003) |
 | INFO | dotenv interpolates a leading `$` to empty string | seed credentials silently vanish if unescaped | Documented in README + `.env.example` (`\$`) |
@@ -735,6 +737,7 @@ bun run dev            # verify: curl localhost:3000/api/health
 | INFO | Dev-mode Prisma query logging prints SQL templates with `?` placeholders — bound parameter VALUES are not printed (Prisma 6.11, session-14 verified) | none — the earlier "bound parameters are printed" claim was corrected in `src/lib/db.ts` | Keep dev.log out of shared systems anyway (defense in depth) |
 | INFO | `next build` embeds a copy of `.env` (incl. `ADMIN_PASSWORD`/`AUTH_SECRET`) at `.next/standalone/.env` | artifact shippers export the staff password inside the build output | Documented + remediation steps in `docs/DEPLOYMENT.md` §1 (session-14 F4: strip or rotate) |
 | INFO | `no-html-link-for-pages` cannot see non-root App-Router page anchors (href trailing-slash normalization vs route regex asymmetry) | plain `<a href="/page">` regressions are invisible to the lint gate | Blind spot recorded in `eslint.config.mjs`; audits grep for page-href anchors manually (session-14 F1) |
+| INFO | The framework's internal 308 trailing-slash redirect carries no security headers (`headers()` applies only from route matching onward) | empty-body redirect, ~nil exposure; docs claim corrected to "every route response and app-level redirect" | Known limitation, e2e-pinned both edges (session-16 F1) |
 
 ---
 
@@ -742,21 +745,24 @@ bun run dev            # verify: curl localhost:3000/api/health
 
 | File | Lines | Purpose |
 | ---- | ----- | ------- |
-| `src/app/globals.css` | ~280 | Design system: tokens, unlayered base cascade, reveal CSS, custom classes |
+| `src/app/globals.css` | ~284 | Design system: tokens, unlayered base cascade, reveal CSS, custom classes |
 | `src/components/site/header.tsx` | ~200 | Fixed chrome: mobile menu, scroll-spy, pastHero color swap |
 | `src/components/site/services.tsx` | ~90 | Gradient band + stacked-entrance cards |
-| `src/components/site/appointment-form.tsx` | ~165 | The write path UI with submit states |
+| `src/components/site/appointment-form.tsx` | ~234 | The write path UI with submit states |
 | `src/components/site/reveal.tsx` | ~70 | Hydration-safe reveal choreography |
 | `src/lib/content.ts` | ~190 | All site copy, icon maps, nav contracts |
 | `src/lib/auth.ts` | ~120 | scrypt + HMAC session primitives (unit-tested seam) |
-| `src/app/api/appointments/route.ts` | ~170 | Validation, rate limiting, persistence |
+| `src/app/api/appointments/route.ts` | ~82 | Validation seam call, rate limiting, persistence |
 | `src/app/api/auth/login/route.ts` | ~130 | Credential verify, session cookie, login limiter |
-| `src/app/dashboard/page.tsx` | ~210 | Session-guarded stats + appointments table (RSC) |
+| `src/app/dashboard/page.tsx` | ~279 | Session-guarded stats + appointments table with status transitions (RSC) |
 | `scripts/seed.ts` | ~40 | db:seed staff account upsert |
 | `src/lib/db-path.ts` | ~110 | Pure SQLite URL resolution (tested seam) |
 | `tests/e2e/mobile-navigation.spec.ts` | ~170 | Chrome contract + Tailwind v4 trap guards |
-| `tests/e2e/auth.spec.ts` | ~110 | Full auth loop incl. public-form→dashboard visibility |
+| `tests/e2e/auth.spec.ts` | ~230 | Full auth loop incl. public-form→dashboard visibility |
 | `docs/Tailwind-V4-Validation-Report.md` | ~310 | Authoritative engine trap log |
+| `src/app/api/appointments/[id]/route.ts` | ~134 | Staff status-transition write path (PATCH, session-guarded) |
+| `src/components/dashboard/status-button.tsx` | ~85 | Status transition client island (Confirm/Complete) |
+| `tests/e2e/appointments-status.spec.ts` | ~134 | Dashboard status loop + PATCH guard/validation pins |
 | `docs/remediation-plan-session2.md` | — | Session-2 audit findings + remediation record |
 
 ---

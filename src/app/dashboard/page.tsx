@@ -6,7 +6,9 @@ import { HeartPulse, CalendarDays, Phone, Mail } from "lucide-react";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 import { upcomingVisitsFloor } from "@/lib/validation";
+import { appointmentStatuses } from "@/lib/content";
 import { LogoutButton } from "@/components/dashboard/logout-button";
+import { StatusButton } from "@/components/dashboard/status-button";
 
 /* Staff dashboard — the review surface for the appointment requests captured
  * by the public form. Like /login, this is an intentional extension beyond
@@ -35,6 +37,23 @@ const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
 });
+
+/* Badge presentation per workflow state (session-16 G1). The LABELS come
+ * from content.ts appointmentStatuses — the value space shared with the
+ * API allowlist; unknown values (e.g. a hand-edited DB row) fall back to
+ * rendering the raw value, React-escaped. */
+const STATUS_BADGE_CLASS: Record<string, string> = {
+  new: "bg-secondary/70 text-primary",
+  confirmed: "bg-primary/10 text-primary",
+  completed: "bg-muted text-muted-foreground",
+};
+
+function statusLabel(value: string): string {
+  return (
+    appointmentStatuses.find((status) => status.value === value)?.label ??
+    value
+  );
+}
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -86,6 +105,7 @@ export default async function DashboardPage() {
           email: true,
           specialty: true,
           preferredDate: true,
+          status: true,
           createdAt: true,
         },
       }),
@@ -166,7 +186,7 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="-mx-2 overflow-x-auto px-2">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
+              <table className="w-full min-w-[840px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-primary/15 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <th scope="col" className="py-3 pr-4 font-medium">
@@ -181,8 +201,11 @@ export default async function DashboardPage() {
                     <th scope="col" className="py-3 pr-4 font-medium">
                       Specialty
                     </th>
-                    <th scope="col" className="py-3 font-medium">
+                    <th scope="col" className="py-3 pr-4 font-medium">
                       Preferred date
+                    </th>
+                    <th scope="col" className="py-3 font-medium">
+                      Status
                     </th>
                   </tr>
                 </thead>
@@ -222,8 +245,22 @@ export default async function DashboardPage() {
                       <td className="whitespace-nowrap py-4 pr-4 align-top text-muted-foreground">
                         {appointment.specialty}
                       </td>
-                      <td className="whitespace-nowrap py-4 align-top text-muted-foreground">
+                      <td className="whitespace-nowrap py-4 pr-4 align-top text-muted-foreground">
                         {appointment.preferredDate ?? "—"}
+                      </td>
+                      <td className="whitespace-nowrap py-4 align-top">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            STATUS_BADGE_CLASS[appointment.status] ??
+                            "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {statusLabel(appointment.status)}
+                        </span>
+                        <StatusButton
+                          id={appointment.id}
+                          status={appointment.status}
+                        />
                       </td>
                     </tr>
                   ))}

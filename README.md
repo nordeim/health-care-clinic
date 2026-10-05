@@ -46,9 +46,9 @@ geometry).
 | ❓ FAQ accordion | Native `<details>`/`<summary>` with rotating plus glyphs |
 | ⚖️ Legal pages | `/privacy-policy` and `/accessibility-statement` with identical copy and layout |
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
-| 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests, server-guarded |
-| 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), strict server-side payload validation, and baseline security headers on every response (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, no `X-Powered-By`) |
-| ✅ Tested | 85 unit tests + 41 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract, the curated transport-failure message, and the validation + timing-equalization seams |
+| 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests with status transitions (New → Confirmed → Completed via `PATCH /api/appointments/[id]`), server-guarded |
+| 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), strict server-side payload validation, and baseline security headers on every route response and app-level redirect (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, no `X-Powered-By`; the framework's internal 308 trailing-slash redirect is emitted before `headers()` applies — a documented, e2e-pinned limitation) |
+| ✅ Tested | 95 unit tests + 43 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), and the validation + timing-equalization + status seams |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified
@@ -94,8 +94,8 @@ flowchart TB
 ├── 📂 app/
 │   ├── 📄 globals.css            ← Tailwind v4 theme: full hsl() tokens, pinned shadows, base element rules
 │   ├── 📄 layout.tsx             ← DM Sans via next/font, metadata, viewport
-│   ├── 📄 page.tsx               ← Landing composition (9 sections)
-│   ├── 📂 api/appointments/      ← POST — validated writes
+│   ├── 📄 page.tsx               ← Landing composition (8 scroll sections + fixed header + footer)
+│   ├── 📂 api/appointments/      ← POST — validated writes; [id]/ PATCH — staff status transitions
 │   ├── 📂 api/auth/              ← POST login/logout — scrypt verify + session cookie
 │   ├── 📂 api/health/            ← GET — liveness + DB probe
 │   ├── 📂 login/                 ← Staff sign-in page (not linked from the landing page)
@@ -105,16 +105,21 @@ flowchart TB
 ├── 📂 components/site/           ← Header, Hero, About, Services, Differentiators,
 │                                   Insurance, Team, Contact, AppointmentForm, Faq,
 │                                   Footer, LegalPage, Reveal
-├── 📂 components/dashboard/      ← LoginForm, LogoutButton (client islands)
+├── 📂 components/dashboard/      ← LoginForm, LogoutButton, StatusButton (client islands)
 └── 📂 lib/
-    ├── 📄 content.ts             ← All site copy + icon maps (single source)
+    ├── 📄 content.ts             ← All site copy + icon maps + status labels (single source)
     ├── 📄 auth.ts                ← scrypt + HMAC session primitives (unit-tested)
+    ├── 📄 validation.ts          ← Appointment + status validation seams (unit-tested)
+    ├── 📄 rate-limit.ts          ← XFF keying, fixed-window limiter, 64 KiB body cap (unit-tested)
+    ├── 📄 motion.ts              ← Reduced-motion-aware scroll behavior
     ├── 📄 db.ts                  ← Prisma singleton (env-resolved URL)
     └── 📄 db-path.ts             ← SQLite path resolution (unit-tested)
 📂 prisma/schema.prisma           ← Appointment + AdminUser models
 📂 scripts/seed.ts                ← db:seed — staff account upsert
 📂 tests/e2e/                     ← Playwright specs (mobile-navigation, landing,
-│                                   appointment-form, legal-pages, auth)
+│                                   appointment-form, appointments-status, legal-pages, auth)
+📂 tests/*.test.ts                ← Vitest seams (db-path, auth, deps, validation,
+│                                   rate-limit, status)
 📂 public/media/                  ← Hero video/poster, section photography
 📂 docs/                          ← Validation report, screenshots, deployment
 ```
@@ -150,6 +155,7 @@ starting with `$` must be escaped as `\$`).
 | `/api/appointments` | POST | `{fullName, phone, email?, specialty, preferredDate?}` → `201 {ok, id}` | 422 with field map on invalid input (non-object bodies get the same field map; email capped at 254 chars); 413 over 64 KiB (stream-read cap — holds for chunked bodies AND transport errors degrade to 400); 429 when rate-limited (5 req / 10 min / IP) |
 | `/api/health` | GET | `200 {ok, database}` | 503 when the DB is unreachable |
 | `/api/auth/login` | POST | `{email, password}` → `200 {ok}` + httpOnly session cookie | 401 generic error (no user enumeration); 422 field map (email pattern + the shared 254-char bound); 429 rate-limited (10 / 10 min / IP) |
+| `/api/appointments/[id]` | PATCH | `{status}` → `200 {ok, id, status}` (staff session required) | 401 anonymous; 422 field map (status allowlist: new/confirmed/completed); 404 unknown id; 413 over 64 KiB; 429 rate-limited (60 / 10 min / IP) |
 | `/api/auth/logout` | POST | → `200 {ok}` | Clears the session cookie; idempotent |
 
 ## Environment Variables
@@ -232,4 +238,4 @@ bun .next/standalone/server.js   # PORT + DATABASE_URL from the environment
 | `space-y-*` gaps differ from the reference | v4 `:where()` selector rewrite (trap #4) | Prefer grid/flex gaps, or pad children directly |
 | e2e color assertions fail on format | v4 computes opacity modifiers as `oklab(...)` | Rasterize pixels (see mobile-navigation spec), don't string-match |
 | Data lands in the wrong `custom.db` | An ambient `DATABASE_URL` env var shadows the repo `.env` | The `dev`/`build`/`db:*` scripts `env -u` it away; `start` (production) intentionally reads ambient env |
-| `db:seed` says credentials are missing | dotenv interpolated a leading `$` in the password to `""` | Escape it in `.env`: `ADMIN_PASSWORD="\$Abcd1234"` |
+| `db:seed` says credentials are missing | dotenv interpolated a leading `$` in the password to `""` | Escape it in `.env`: `ADMIN_PASSWORD="\$up3rS3cretPass"` |

@@ -23,6 +23,12 @@ test.describe("landing page", () => {
     // referrer policy) is applied in next.config.ts for every route —
     // response headers are invisible to rendering, so parity is untouched.
     // A full CSP belongs to the reverse-proxy seam (DEPLOYMENT.md §6).
+    //
+    // Session-16 F1 coverage refinement: "every route" means every ROUTE
+    // RESPONSE and app-level redirect — Next's internal 308 trailing-slash
+    // normalization is emitted before headers() applies and carries none
+    // of the set. Both edges are pinned below so a framework change that
+    // moves either boundary gets noticed.
     const response = await request.get("/");
     expect(response.status()).toBe(200);
     expect(response.headers()["x-content-type-options"]).toBe("nosniff");
@@ -31,6 +37,27 @@ test.describe("landing page", () => {
       "strict-origin-when-cross-origin",
     );
     expect(response.headers()["x-powered-by"]).toBeUndefined();
+
+    // App-level redirects (the dashboard's session guard) carry the set.
+    const redirected = await request.get("/dashboard", {
+      maxRedirects: 0,
+    });
+    expect(redirected.status()).toBe(307);
+    expect(redirected.headers()["x-content-type-options"]).toBe("nosniff");
+    expect(redirected.headers()["x-frame-options"]).toBe("DENY");
+    expect(redirected.headers()["referrer-policy"]).toBe(
+      "strict-origin-when-cross-origin",
+    );
+
+    // Framework-level 308 (trailing-slash normalization): redirects to the
+    // canonical path WITHOUT the security set — the documented limitation
+    // (empty-body redirect, ~nil exposure; PAD known-issues table).
+    const normalized = await request.get("/privacy-policy/", {
+      maxRedirects: 0,
+    });
+    expect(normalized.status()).toBe(308);
+    expect(normalized.headers()["location"]).toBe("/privacy-policy");
+    expect(normalized.headers()["x-content-type-options"]).toBeUndefined();
   });
 
   test("renders the hero with the four-line headline and video", async ({ page }) => {

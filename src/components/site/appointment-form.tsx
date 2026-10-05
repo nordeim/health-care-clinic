@@ -6,7 +6,7 @@ import { services } from "@/lib/content";
 /* ---------------------------------------------------------------------------
  * Appointment request form.
  *
- * Reference behavior, ported: underline-style inputs, anative <select> for
+ * Reference behavior, ported: underline-style inputs, a native <select> for
  * the specialty, an optional date, and a submit button that disables and
  * reads "Sending…" while the request is in flight.
  *
@@ -118,7 +118,6 @@ export function AppointmentForm() {
   return (
     <form
       onSubmit={onSubmit}
-      noValidate={false}
       className="mt-8 grid gap-x-6 gap-y-4 sm:grid-cols-2"
     >
       <div className="grid content-start">
