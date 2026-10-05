@@ -23,32 +23,32 @@ import {
  * dependency); the env fallback rule is covered separately. */
 
 describe("hashPassword / verifyPassword", () => {
-  it("round-trips a correct password", () => {
-    const stored = hashPassword("s3cret-Password!");
+  it("round-trips a correct password", async () => {
+    const stored = await hashPassword("s3cret-Password!");
     expect(stored).toMatch(/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
-    expect(verifyPassword("s3cret-Password!", stored)).toBe(true);
+    await expect(verifyPassword("s3cret-Password!", stored)).resolves.toBe(true);
   });
 
-  it("rejects a wrong password", () => {
-    const stored = hashPassword("s3cret-Password!");
-    expect(verifyPassword("s3cret-Password?", stored)).toBe(false);
-    expect(verifyPassword("", stored)).toBe(false);
-    expect(verifyPassword("s3cret-password!", stored)).toBe(false);
+  it("rejects a wrong password", async () => {
+    const stored = await hashPassword("s3cret-Password!");
+    await expect(verifyPassword("s3cret-Password?", stored)).resolves.toBe(false);
+    await expect(verifyPassword("", stored)).resolves.toBe(false);
+    await expect(verifyPassword("s3cret-password!", stored)).resolves.toBe(false);
   });
 
-  it("salts every hash — identical passwords never hash alike", () => {
-    const a = hashPassword("same-password");
-    const b = hashPassword("same-password");
+  it("salts every hash — identical passwords never hash alike", async () => {
+    const a = await hashPassword("same-password");
+    const b = await hashPassword("same-password");
     expect(a).not.toBe(b);
-    expect(verifyPassword("same-password", a)).toBe(true);
-    expect(verifyPassword("same-password", b)).toBe(true);
+    await expect(verifyPassword("same-password", a)).resolves.toBe(true);
+    await expect(verifyPassword("same-password", b)).resolves.toBe(true);
   });
 
-  it("rejects malformed stored hashes instead of throwing", () => {
-    expect(verifyPassword("x", "")).toBe(false);
-    expect(verifyPassword("x", "not-a-hash")).toBe(false);
-    expect(verifyPassword("x", "scrypt$zz$zz")).toBe(false);
-    expect(verifyPassword("x", "scrypt$deadbeef$deadbeef")).toBe(false);
+  it("rejects malformed stored hashes instead of throwing", async () => {
+    await expect(verifyPassword("x", "")).resolves.toBe(false);
+    await expect(verifyPassword("x", "not-a-hash")).resolves.toBe(false);
+    await expect(verifyPassword("x", "scrypt$zz$zz")).resolves.toBe(false);
+    await expect(verifyPassword("x", "scrypt$deadbeef$deadbeef")).resolves.toBe(false);
   });
 });
 
@@ -153,23 +153,35 @@ describe("login timing equalization (DUMMY_HASH / verifyLoginPassword)", () => {
     expect(DUMMY_HASH).toMatch(/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
   });
 
-  it("verifyLoginPassword returns false for a null stored hash", () => {
-    expect(verifyLoginPassword("any-password", null)).toBe(false);
-    expect(verifyLoginPassword("", null)).toBe(false);
+  it("verifyLoginPassword returns false for a null stored hash", async () => {
+    await expect(verifyLoginPassword("any-password", null)).resolves.toBe(false);
+    await expect(verifyLoginPassword("", null)).resolves.toBe(false);
   });
 
-  it("verifyLoginPassword burns real scrypt time on the null path (no fast-fail)", () => {
+  it("verifyLoginPassword burns real scrypt time on the null path (no fast-fail)", async () => {
     // scrypt at N=16384 takes ~30ms on this hardware; the non-scrypt path
     // is <1ms. A 10ms floor separates them by an order of magnitude on
     // each side — safe against CI flake while still pinning the contract.
     const started = Date.now();
-    verifyLoginPassword("any-password", null);
+    await verifyLoginPassword("any-password", null);
     expect(Date.now() - started).toBeGreaterThanOrEqual(10);
   });
 
-  it("verifyLoginPassword delegates to verifyPassword for real hashes", () => {
-    const stored = hashPassword("correct-horse");
-    expect(verifyLoginPassword("correct-horse", stored)).toBe(true);
-    expect(verifyLoginPassword("wrong-horse", stored)).toBe(false);
+  it("verifyLoginPassword delegates to verifyPassword for real hashes", async () => {
+    const stored = await hashPassword("correct-horse");
+    await expect(verifyLoginPassword("correct-horse", stored)).resolves.toBe(true);
+    await expect(verifyLoginPassword("wrong-horse", stored)).resolves.toBe(false);
+  });
+
+  it("password verification is ASYNCHRONOUS — the event loop breathes during scrypt", async () => {
+    // Session-10 F3: scryptSync blocked the event loop ~30-50ms per login
+    // attempt, so a burst of attempts (or XFF-spoofed key rotation against
+    // a directly-exposed server) starved EVERY concurrent request —
+    // appointments included. The async form burns identical CPU on the
+    // libuv threadpool, so the timing-equalization contract is unchanged
+    // while the loop stays responsive.
+    const pending = verifyLoginPassword("any-password", null);
+    expect(pending).toBeInstanceOf(Promise);
+    await expect(pending).resolves.toBe(false);
   });
 });

@@ -7,10 +7,10 @@ description: >
   dependency-free staff auth/dashboard extension. Captures the
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
-  methodology, and every hard-won lesson from sessions 1, 2, 4, 6 and 8.
-version: 2.3.0
+  methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8 and 10.
+version: 2.4.0
 last_updated: 2026-10-05
-project_state: 65 unit tests + 34 e2e tests green; HTTP edge hardened (timing-equalized login, last-token XFF rate limiting, 413 body cap, impossible-date rejection); env-leak guard active (env -u)
+project_state: 76 unit tests + 37 e2e tests green; HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, non-object body tolerance on both POST routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection); env-leak guard active (env -u)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -326,11 +326,11 @@ API calls surface there. API failures log structured messages
 ```bash
 bun run lint          # 0 errors
 bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
-bun run test          # 65/65 (db-path 15 + auth 18 + deps 4 +
-                      #  validation 18 + rate-limit 10)
+bun run test          # 76/76 (db-path 15 + auth 19 + deps 4 +
+                      #  validation 20 + rate-limit 18)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
-bun run test:e2e      # 34/34 (5 spec files)
+bun run test:e2e      # 37/37 (5 spec files)
 ```
 
 Manual smoke: mobile menu open → link click (closes + jumps) → Escape
@@ -599,3 +599,28 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   Live parity re-verified byte-exact on both sites; product loop green
   under the active ambient hijack; 11 screenshots refreshed (incl. the
   NEW 14-appointment-field-errors state).
+- **Session 10** (edge closure + robustness): the fresh-eyes audit found
+  what session 8's own hardening had left half-open — `POST
+  /api/auth/login` 500'd on a JSON `null` body (property access outside
+  the parse try/catch; the sibling appointments route had the guard since
+  session 8), the 64 KiB body cap trusted only `content-length` so a
+  CHUNKED request bypassed it entirely (verified live: a 70 KiB chunked
+  POST buffered and parsed to a 422), and `scryptSync` blocked the event
+  loop ~30-50 ms per login attempt (spoofed-key bursts starved every
+  concurrent request). Remediated TDD-first: `readJsonBody` seam in
+  `rate-limit.ts` (stream-read with hard byte cap, socket cancelled on
+  breach — 8 unit tests incl. the exact 64 KiB boundary), the login
+  non-object body guard (422 field map, e2e-pinned on both routes),
+  `promisify(scrypt)` (identical CPU on the libuv threadpool — DUMMY_HASH
+  and the timing-equalization contract untouched; verified live: health
+  polls interleave during concurrent scrypt logins), a one-day
+  west-of-server timezone tolerance on the not-in-the-past floor,
+  `src/lib/motion.ts` `scrollBehavior()` for reduced-motion instant jumps
+  in both CTA handlers, and per-run spoofed XFF keys in the limiter e2e
+  specs (`reuseExistingServer` can no longer poison buckets). Unit suite
+  65 → 76; e2e 34 → 37. Live parity re-verified byte-exact (mobile
+  link-click 0.0004998518957345971 on BOTH sites, same session, same
+  method); methodology note: agent-browser's DEFAULT viewport is
+  1280×577 — set 1440×900 explicitly or heights mislead (7229px artifact
+  observed and explained). 11 screenshots refreshed from the remediated
+  dev server.

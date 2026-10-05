@@ -1,9 +1,12 @@
 import {
   createHmac,
   randomBytes,
-  scryptSync,
+  scrypt as scryptCallback,
   timingSafeEqual,
+  type BinaryLike,
+  type ScryptOptions,
 } from "node:crypto";
+import { promisify } from "node:util";
 
 /* ---------------------------------------------------------------------------
  * Staff authentication — pure primitives (no database access).
@@ -25,7 +28,20 @@ import {
  * secret fails fast (signing throws); in development it falls back to a
  * fixed constant with a one-time console warning so local setups keep
  * working out of the box.
+ *
+ * scrypt is ASYNC (session-10 F3): the sync form blocked the event loop
+ * ~30-50ms per derivation, so login bursts (or XFF-spoofed key rotation
+ * against a directly-exposed server) starved every concurrent request.
+ * The promisified form burns IDENTICAL CPU on the libuv threadpool —
+ * the timing-equalization contract is unchanged.
  * ------------------------------------------------------------------------- */
+
+const scrypt = promisify(scryptCallback) as (
+  password: BinaryLike,
+  salt: BinaryLike,
+  keylen: number,
+  options: ScryptOptions,
+) => Promise<Buffer>;
 
 export const SESSION_COOKIE = "clinic_session";
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // one week
@@ -70,26 +86,29 @@ export const DUMMY_HASH =
  * unknown-email and wrong-password paths take indistinguishable time.
  * Callers decide success separately (`admin !== null && ok`) AFTER this
  * call — never short-circuit around it. */
-export function verifyLoginPassword(
+export async function verifyLoginPassword(
   password: string,
   storedHash: string | null,
-): boolean {
+): Promise<boolean> {
   return verifyPassword(password, storedHash ?? DUMMY_HASH);
 }
 
-export function hashPassword(password: string): string {
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, SCRYPT_KEYLEN, SCRYPT_COST);
+  const hash = await scrypt(password, salt, SCRYPT_KEYLEN, SCRYPT_COST);
   return `scrypt$${salt.toString("hex")}$${hash.toString("hex")}`;
 }
 
-export function verifyPassword(password: string, stored: string): boolean {
+export async function verifyPassword(
+  password: string,
+  stored: string,
+): Promise<boolean> {
   const parts = stored.split("$");
   if (parts.length !== 3 || parts[0] !== "scrypt") return false;
   const salt = Buffer.from(parts[1], "hex");
   const expected = Buffer.from(parts[2], "hex");
   if (salt.length === 0 || expected.length !== SCRYPT_KEYLEN) return false;
-  const actual = scryptSync(password, salt, SCRYPT_KEYLEN, SCRYPT_COST);
+  const actual = await scrypt(password, salt, SCRYPT_KEYLEN, SCRYPT_COST);
   return timingSafeEqual(actual, expected);
 }
 

@@ -85,7 +85,17 @@ the database is unreachable — wire your uptime monitor to it.
   Known limitation (accepted): App Router route handlers cannot read the
   socket address, so a server exposed DIRECTLY (no proxy) can still be
   spoofed via a fabricated XFF header — run behind the proxy. Proxy-less
-  requests (local dev) share a single `unknown` bucket.
+  requests (local dev) share a single `unknown` bucket. The limiter map is
+  swept every window; under fabricated-key rotation its in-window growth is
+  bounded by request volume (each bucket is ~50 bytes — flooding rates that
+  would matter here dwarf the per-request parsing costs that fall over
+  first). Login also burns scrypt ASYNC on the libuv threadpool since
+  session 10, so spoofed-key bursts can no longer starve the event loop.
+- Request bodies are capped at 64 KiB **in-process while stream-reading**
+  (session 10): both POST routes return 413 the moment the byte count
+  crosses the cap — chunked bodies without a `content-length` header are
+  capped identically. A proxy `client_max_body_size` is therefore optional
+  belt-and-braces, not the enforcement.
 - Serve `/media/hero-video.mp4` (11 MB) with caching headers or from a
   CDN in front of the app.
 - One cookie exists (`clinic_session`, httpOnly, SameSite=Lax, Secure in

@@ -3,9 +3,9 @@ import { db } from "@/lib/db";
 import { validateAppointmentPayload } from "@/lib/validation";
 import {
   MAX_BODY_BYTES,
-  bodyTooLarge,
   clientKey,
   createRateLimiter,
+  readJsonBody,
 } from "@/lib/rate-limit";
 
 /* ---------------------------------------------------------------------------
@@ -17,10 +17,12 @@ import {
  *    published service list or "Primary Care"), preferredDate (optional,
  *    YYYY-MM-DD, a REAL calendar date, not in the past — impossible dates
  *    like 2025-02-31 are rejected by the seam's component round-trip).
- *  - 413 when the body exceeds 64 KiB; 422 with a field map on validation
- *    failure; 429 when the per-IP limiter trips (5 / 10 min, keyed on the
- *    LAST X-Forwarded-For token — see src/lib/rate-limit.ts); 201 with the
- *    persisted id on success.
+ *  - 413 when the body exceeds 64 KiB (enforced while STREAM-READING —
+ *    chunked bodies without a content-length are capped too, session-10
+ *    F2); 422 with a field map on validation failure; 429 when the
+ *    per-IP limiter trips (5 / 10 min, keyed on the LAST X-Forwarded-For
+ *    token — see src/lib/rate-limit.ts); 201 with the persisted id on
+ *    success.
  *  - The response NEVER echoes the submitted payload back (minimizes PII
  *    reflection); failures are safe to display verbatim.
  * ------------------------------------------------------------------------- */
@@ -38,24 +40,20 @@ export async function POST(request: Request) {
     );
   }
 
-  if (bodyTooLarge(request)) {
+  const body = await readJsonBody(request);
+  if (!body.ok) {
     return NextResponse.json(
-      { error: `That request is too large (over ${MAX_BODY_BYTES / 1024} KiB). Please call us instead.` },
-      { status: 413 },
+      {
+        error:
+          body.status === 413
+            ? `That request is too large (over ${MAX_BODY_BYTES / 1024} KiB). Please call us instead.`
+            : "Invalid request body.",
+      },
+      { status: body.status },
     );
   }
 
-  let payload: unknown;
-  try {
-    payload = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid request body." },
-      { status: 400 },
-    );
-  }
-
-  const result = validateAppointmentPayload(payload);
+  const result = validateAppointmentPayload(body.value);
   if (!result.ok) {
     return NextResponse.json(
       { error: "Please check the highlighted fields.", fields: result.fields },

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { heroBadgeMessages } from "@/lib/content";
+import { scrollBehavior } from "@/lib/motion";
 
 /* ---------------------------------------------------------------------------
  * Hero — full-viewport autoplaying video with a readability scrim, the
@@ -53,7 +54,11 @@ export function Hero() {
   const BadgeIcon = badge.icon;
 
   const scrollToContact = () => {
-    document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
+    // Reduced-motion users get an instant jump (src/lib/motion.ts,
+    // session-10 F7); everyone else keeps the reference's smooth scroll.
+    document
+      .getElementById("contact")
+      ?.scrollIntoView({ behavior: scrollBehavior() });
   };
 
   return (

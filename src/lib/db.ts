@@ -24,6 +24,10 @@ const globalForPrisma = globalThis as unknown as {
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
+    // Dev query logging prints BOUND PARAMETERS — patient names, phones,
+    // emails — to the dev console (session-10 audit note). Dev-only and
+    // single-operator by design; do not pipe dev.log into shared systems,
+    // or narrow this to ['error', 'warn'] if it ever is.
     log: process.env.NODE_ENV === 'production' ? ['error'] : ['query'],
   })
 

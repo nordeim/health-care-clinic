@@ -62,6 +62,22 @@ test.describe("appointment form", () => {
     });
   });
 
+  test("a non-object JSON body gets the 422 field map, never a 500", async ({ request }) => {
+    // Route-level pin of the seam's documented non-object tolerance
+    // (session-10 F1 mirror): `null` is valid JSON; the seam turns it into
+    // an empty record and the route answers the standard 422 field map.
+    const response = await request.post("/api/appointments", {
+      headers: { "X-Forwarded-For": "203.0.113.4" },
+      data: null as unknown as object,
+    });
+    expect(response.status()).toBe(422);
+    const body = await response.json();
+    expect(body.fields).toMatchObject({
+      fullName: expect.any(String),
+      phone: expect.any(String),
+    });
+  });
+
   test("server-side validation rejects impossible calendar dates (no JS rollover)", async ({ request }) => {
     // 2025-02-31 used to parse as March 3 and PERSIST as garbage — the
     // validation seam now round-trips the components (session-8 F4).
@@ -111,7 +127,13 @@ test.describe("appointment form", () => {
     // socket address, so this also pins the keying the limiter actually
     // uses (session-8 F2). The five persisted probe rows are inert — no
     // spec asserts the "Limiter Probe" name with a strict locator.
-    const headers = { "X-Forwarded-For": "203.0.113.99" };
+    //
+    // The key is UNIQUE PER RUN (session-10 F6): the standalone server's
+    // limiter state is in-memory, and with `reuseExistingServer` an
+    // operator-left server on :3100 would carry the previous run's bucket
+    // for a fixed key — the first POST would 429 and the 201 assertion
+    // below would fail. A per-run key makes the bucket provably fresh.
+    const headers = { "X-Forwarded-For": `203.0.113.${(Date.now() % 200) + 10}` };
     for (let i = 0; i < 5; i += 1) {
       const response = await request.post("/api/appointments", {
         headers,
@@ -127,8 +149,12 @@ test.describe("appointment form", () => {
   });
 
   test("oversized bodies are rejected with 413 before parsing", async ({ request }) => {
+    // Per-run key (session-10 F6): the 413 check runs after the limiter
+    // counts the request, so a leftover server's bucket for a fixed key
+    // could turn this into a 429. A fresh key keeps the assertion about
+    // the body cap.
     const response = await request.post("/api/appointments", {
-      headers: { "X-Forwarded-For": "203.0.113.3" },
+      headers: { "X-Forwarded-For": `198.51.100.${(Date.now() % 200) + 10}` },
       data: { fullName: "x".repeat(70 * 1024), phone: "555-0197", specialty: "Primary Care" },
     });
     expect(response.status()).toBe(413);

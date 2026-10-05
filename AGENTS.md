@@ -91,13 +91,15 @@ stays byte-faithful. All marketing copy lives in
    remove the `env -u` guards — a stray exported variable silently
    redirects writes to a database outside the repo.
 9. **Staff auth is dependency-free by design** (`src/lib/auth.ts`, pinned
-   by `tests/auth.test.ts`): scrypt password hashing + HMAC-SHA256 session
-   tokens from Node's crypto module — no external auth library. `AUTH_SECRET`
-   is required in production (signing throws without it); dev falls back to
-   a constant with a console warning. The login route returns a GENERIC 401
-   (never reveal whether the email exists) and rate-limits 10/10min/IP.
-   `/dashboard` guards itself as a Server Component (redirect to `/login`);
-   no middleware exists — don't add one without updating the ADR log.
+   by `tests/auth.test.ts`): scrypt (ASYNC — `promisify(scrypt)`, so the
+   event loop breathes under bursts; identical CPU on both failure paths)
+   + HMAC-SHA256 session tokens from Node's crypto module — no external
+   auth library. `AUTH_SECRET` is required in production (signing throws
+   without it); dev falls back to a constant with a console warning. The
+   login route returns a GENERIC 401 (never reveal whether the email
+   exists) and rate-limits 10/10min/IP. `/dashboard` guards itself as a
+   Server Component (redirect to `/login`); no middleware exists — don't
+   add one without updating the ADR log.
 10. **dotenv `$` interpolation gotcha:** a value starting with `$` in `.env`
     (e.g. `ADMIN_PASSWORD="$Abcd1234"`) resolves to `""` — escape it as
     `\$`. This bit the seed script once; the troubleshooting table in
@@ -114,10 +116,13 @@ stays byte-faithful. All marketing copy lives in
   that list — never hand-copy service names into a second place.
 - Rate limiting + body caps live in `src/lib/rate-limit.ts`: the limiter
   keys on the LAST `X-Forwarded-For` token (the proxy-appended address);
-  bodies over 64 KiB get a 413 before parsing. The login route ALWAYS
-  burns scrypt (`verifyLoginPassword` + DUMMY_HASH in `src/lib/auth.ts`)
-  — never short-circuit around it, or the timing-enumeration oracle
-  returns.
+  `readJsonBody` STREAM-READS with the 64 KiB cap for every transport
+  shape (content-length is only a fast path — chunked bodies are capped
+  mid-stream and the socket is cancelled). Both POST routes tolerate
+  non-object JSON bodies (null/scalars) with a 422 field map — never
+  `request.json()` directly. The login route ALWAYS burns scrypt
+  (`verifyLoginPassword` + DUMMY_HASH in `src/lib/auth.ts`) — never
+  short-circuit around it, or the timing-enumeration oracle returns.
 - Section ids are a public contract: `#top #about #services #insurance
   #providers #contact #faq` — the nav, scroll-spy, CTAs and e2e specs all
   depend on them.

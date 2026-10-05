@@ -197,6 +197,32 @@ describe("validateAppointmentPayload", () => {
     );
   });
 
+  it("accepts yesterday — one day of west-of-server timezone tolerance", () => {
+    // Session-10 F4: the browser date input yields the PATIENT's local
+    // calendar date, but the not-in-the-past floor used the SERVER's local
+    // midnight. A patient west of the server (UTC server, US patient in
+    // their evening) legitimately picks their own "today" — already the
+    // server's "yesterday" — and was wrongly rejected. One day of
+    // westward drift is accepted; the stale-request guard still rejects
+    // anything older.
+    const result = validateAppointmentPayload(
+      { ...valid, preferredDate: "2098-12-31" },
+      fixedNow("2099-01-01"),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects two days ago (the stale-request guard still bites)", () => {
+    const result = validateAppointmentPayload(
+      { ...valid, preferredDate: "2098-12-30" },
+      fixedNow("2099-01-01"),
+    );
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.fields.preferredDate).toBe(
+      "Pick today or a future date.",
+    );
+  });
+
   it("accepts today (boundary: not in the past)", () => {
     const result = validateAppointmentPayload(
       { ...valid, preferredDate: "2099-01-01" },

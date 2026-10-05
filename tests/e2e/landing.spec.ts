@@ -118,3 +118,27 @@ test.describe("landing page", () => {
     }
   });
 });
+
+test.describe("reduced-motion scrolling (session-10 F7)", () => {
+  // Programmatic scrollIntoView({behavior:"smooth"}) is a JS API argument —
+  // no CSS media guard can reach it. Session-8's reduced-motion sweep
+  // covered the video, heartbeat and badge but not the two CTA scroll
+  // handlers. Under prefers-reduced-motion the CTAs must jump instantly.
+  test.use({ reducedMotion: "reduce" });
+
+  test("the hero CTA jumps instantly under prefers-reduced-motion", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByRole("button", { name: "Get started" }).click();
+
+    // Instant jump = position STABILITY: the scroll lands in one shot
+    // inside the click handler, so an immediate read equals the settled
+    // position (a smooth scroll would still be animating — the immediate
+    // read catches it partway down a ~5000px journey).
+    const immediate = await page.evaluate(() => window.scrollY);
+    expect(immediate).toBeGreaterThan(1000); // actually reached the section
+    await page.waitForTimeout(800);
+    const settled = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(settled - immediate)).toBeLessThan(2); // no animation ran
+  });
+});

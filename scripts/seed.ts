@@ -20,7 +20,7 @@ async function main() {
     );
     process.exit(1);
   }
-  const passwordHash = hashPassword(password);
+  const passwordHash = await hashPassword(password);
   const admin = await db.adminUser.upsert({
     where: { email },
     update: { passwordHash },

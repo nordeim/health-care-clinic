@@ -8,9 +8,9 @@ import {
 } from "@/lib/auth";
 import {
   MAX_BODY_BYTES,
-  bodyTooLarge,
   clientKey,
   createRateLimiter,
+  readJsonBody,
 } from "@/lib/rate-limit";
 
 /* ---------------------------------------------------------------------------
@@ -24,8 +24,12 @@ import {
  *    user-enumeration oracle, in BOTH the response body AND the timing
  *    channel: verifyLoginPassword always burns scrypt, even for unknown
  *    emails (see src/lib/auth.ts DUMMY_HASH).
- *  - 413 when the body exceeds 64 KiB; 422 with a field map on
- *    missing/invalid shapes.
+ *  - 413 when the body exceeds 64 KiB (stream-read cap — holds for
+ *    chunked bodies too, session-10 F2); 400 for unparseable JSON; 422
+ *    with a field map on missing/invalid shapes. Non-object bodies
+ *    (null / scalars) degrade to the 422 field map — property access on
+ *    a JSON `null` used to 500 outside the parse try/catch (session-10
+ *    F1, verified live).
  *  - 429 when the per-IP fixed-window limiter trips (10 attempts / 10 min,
  *    keyed on the LAST X-Forwarded-For token — see src/lib/rate-limit.ts).
  *  - The response never echoes the submitted values back.
@@ -41,19 +45,26 @@ export async function POST(request: Request) {
     );
   }
 
-  if (bodyTooLarge(request)) {
+  const bodyResult = await readJsonBody(request);
+  if (!bodyResult.ok) {
     return NextResponse.json(
-      { error: `That request is too large (over ${MAX_BODY_BYTES / 1024} KiB).` },
-      { status: 413 },
+      {
+        error:
+          bodyResult.status === 413
+            ? `That request is too large (over ${MAX_BODY_BYTES / 1024} KiB).`
+            : "Invalid request body.",
+      },
+      { status: bodyResult.status },
     );
   }
 
-  let body: { email?: unknown; password?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
-  }
+  // Non-object bodies (JSON null, scalars) become an empty record — the
+  // field checks below then produce the standard 422 field map. Mirrors the
+  // appointments seam's documented tolerance.
+  const body: { email?: unknown; password?: unknown } =
+    typeof bodyResult.value === "object" && bodyResult.value !== null
+      ? (bodyResult.value as { email?: unknown; password?: unknown })
+      : {};
 
   const errors: Record<string, string> = {};
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -78,7 +89,9 @@ export async function POST(request: Request) {
     // DUMMY_HASH inside the seam) — so the unknown-email and
     // wrong-password paths take indistinguishable time. The account
     // check happens AFTER the password work, never short-circuits it.
-    const passwordOk = verifyLoginPassword(
+    // (Async scrypt since session-10 F3: the identical CPU burns on the
+    // libuv threadpool, so the event loop stays responsive under bursts.)
+    const passwordOk = await verifyLoginPassword(
       password,
       admin?.passwordHash ?? null,
     );

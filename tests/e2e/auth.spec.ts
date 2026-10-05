@@ -110,6 +110,27 @@ test.describe("staff authentication", () => {
     });
   });
 
+  test("login tolerates non-object JSON bodies (null/scalar never 500s)", async ({ request }) => {
+    // Session-10 F1: `null` is VALID JSON, and property access on it threw
+    // outside the parse try/catch — POST /api/auth/login with body `null`
+    // returned an unhandled 500 (verified live). The route must answer the
+    // same 422 field map the appointments route gives for non-object
+    // bodies. Scalar JSON values (42) are included as the sibling shapes.
+    const headers = { "X-Forwarded-For": "203.0.113.51" };
+    for (const data of [null, 42] as unknown[]) {
+      const response = await request.post("/api/auth/login", {
+        headers,
+        data: data as object,
+      });
+      expect(response.status()).toBe(422);
+      const body = await response.json();
+      expect(body.fields).toMatchObject({
+        email: expect.any(String),
+        password: expect.any(String),
+      });
+    }
+  });
+
   test("unknown email and wrong password are indistinguishable (no enumeration)", async ({ request }) => {
     // Body/status parity for the two failure paths (session-8 F1). The
     // TIMING half of the contract — scrypt runs on both paths via

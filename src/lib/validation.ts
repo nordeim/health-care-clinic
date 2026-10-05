@@ -112,11 +112,17 @@ export function validateAppointmentPayload(
   const preferredDate = asTrimmedString(record.preferredDate);
   if (preferredDate) {
     const { parsed, valid } = isRealCalendarDate(preferredDate);
-    // "Not in the past" compares against LOCAL midnight — the same
-    // semantics the route always used.
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    if (!valid || parsed < today) {
+    // "Not in the past" with ONE DAY of west-of-server tolerance: the
+    // browser date input yields the PATIENT's local calendar date, so a
+    // patient west of the server's timezone (e.g. a UTC server and a US
+    // patient booking during their evening) legitimately picks their own
+    // "today" — which is already the server's "yesterday". Accepting one
+    // day of drift keeps their booking valid; anything older is still a
+    // stale request and rejected.
+    const floor = new Date(now);
+    floor.setHours(0, 0, 0, 0);
+    floor.setDate(floor.getDate() - 1);
+    if (!valid || parsed < floor) {
       errors.preferredDate = "Pick today or a future date.";
     }
   }

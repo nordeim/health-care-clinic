@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HeartPulse, Menu, X } from "lucide-react";
 import { navLinks } from "@/lib/content";
+import { scrollBehavior } from "@/lib/motion";
 
 /* ---------------------------------------------------------------------------
  * Site header.
@@ -95,7 +96,11 @@ export function Header() {
   }, [open, close]);
 
   const scrollToContact = useCallback(() => {
-    document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
+    // Reduced-motion users get an instant jump (src/lib/motion.ts,
+    // session-10 F7); everyone else keeps the reference's smooth scroll.
+    document
+      .getElementById("contact")
+      ?.scrollIntoView({ behavior: scrollBehavior() });
   }, []);
 
   return (

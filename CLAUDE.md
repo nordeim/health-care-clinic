@@ -118,25 +118,29 @@ non-obvious-rules list; this file holds the reasoning.
 
 - **Unit (Vitest):** pure seams only — the SQLite URL resolution contract
   (`tests/db-path.test.ts`, 15 cases), the staff-auth crypto contract
-  (`tests/auth.test.ts`, 18 cases: scrypt round-trips, salt uniqueness,
+  (`tests/auth.test.ts`, 19 cases: scrypt round-trips, salt uniqueness,
   HMAC tamper/expiry rejection, env fallback rules, login timing
-  equalization via DUMMY_HASH), the dependency contract
-  (`tests/deps.test.ts`, 4 cases: runtime/dev allowlist set
+  equalization via DUMMY_HASH, the async-scrypt contract), the dependency
+  contract (`tests/deps.test.ts`, 4 cases: runtime/dev allowlist set
   equality, no removed scaffold package creeps back, `scripts/` holds only
   `seed.ts`), the appointment validation seam (`tests/validation.test.ts`,
-  18 cases: impossible-calendar-date rejection, specialty allowlist
-  derived from content.ts, bounds and defaulting), and the rate-limit seam
-  (`tests/rate-limit.test.ts`, 10 cases: last-token XFF keying, window
-  expiry, max boundary, body cap).
+  20 cases: impossible-calendar-date rejection, specialty allowlist
+  derived from content.ts, bounds and defaulting, west-of-server
+  timezone tolerance), and the rate-limit seam
+  (`tests/rate-limit.test.ts`, 18 cases: last-token XFF keying, window
+  expiry, max boundary, the stream-read 64 KiB body cap including the
+  chunked/no-content-length shape and the exact boundary).
 - **E2E (Playwright):** five spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
-  (section content, anchors, FAQ, CTA scroll, tel: uniformity),
-  `appointment-form` (happy path + 422 validation + 422 UI field errors +
-  429 + 413 + impossible dates + health), `legal-pages`, `auth` (login
+  (section content, anchors, FAQ, CTA scroll, tel: uniformity,
+  reduced-motion instant-jump pin), `appointment-form` (happy path + 422
+  validation + 422 UI field errors + 429 + 413 + impossible dates +
+  non-object body tolerance + health), `legal-pages`, `auth` (login
   page, wrong credentials, session cookie contract incl. sameSite/Secure,
   dashboard guard, logout, full public-form→dashboard loop, enumeration
-  parity). Single worker, shared scratch DB (`db/e2e.db`), standalone
-  server on :3100.
+  parity, non-object body tolerance). Single worker, shared scratch DB
+  (`db/e2e.db`), standalone server on :3100; limiter specs use per-run
+  spoofed XFF keys so a reused server can never poison buckets.
 - **Parity methodology:** computed-style assertions must read the right
   property per engine (v4 uses standalone `rotate`/`scale` properties);
   colors are rasterized to pixels (oklab vs rgba string formats), never
@@ -211,8 +215,8 @@ reference copy today). Do not inline copy edits into components.
 
 ## Success Metrics
 
-- Verification gate green (lint 0, tsc 0 under true strict, 65/65 unit,
-  build OK, 34/34 e2e).
+- Verification gate green (lint 0, tsc 0 under true strict, 76/76 unit,
+  build OK, 37/37 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

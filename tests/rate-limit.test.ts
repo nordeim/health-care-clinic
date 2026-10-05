@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { clientKey, createRateLimiter } from "@/lib/rate-limit";
+import {
+  MAX_BODY_BYTES,
+  clientKey,
+  createRateLimiter,
+  readJsonBody,
+} from "@/lib/rate-limit";
 
 // The rate-limit contract (session-8 remediation plan F2):
 //  1. The limiter is a PURE seam (fixed window, per-key buckets, unref'd
@@ -82,5 +87,129 @@ describe("createRateLimiter", () => {
     expect(limiter.rateLimited("ip-a")).toBe(true);
     clock = 10_000; // window #1 is over
     expect(limiter.rateLimited("ip-a")).toBe(false);
+  });
+});
+
+// The body-cap contract (session-10 remediation plan F2/F5):
+//  1. A content-length header is the FAST path only — a chunked request
+//     (no content-length) previously sailed past the 413 gate and the whole
+//     body was buffered in memory before JSON parsing (verified live: a
+//     70 KiB chunked POST parsed to a 422). readJsonBody stream-reads with
+//     a hard byte cap so the cap holds for EVERY transport shape.
+//  2. The boundary is `>` not `>=`: exactly MAX_BODY_BYTES is accepted.
+describe("readJsonBody", () => {
+  it("parses a valid JSON body posted with a content-length", async () => {
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ fullName: "Ada" }),
+    });
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: true,
+      value: { fullName: "Ada" },
+    });
+  });
+
+  it("rejects an honest oversized content-length before reading a byte", async () => {
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(MAX_BODY_BYTES + 1),
+      },
+      body: "x".repeat(1024),
+    });
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: false,
+      status: 413,
+    });
+  });
+
+  it("caps a body WITHOUT content-length (stream/chunked shape) at 64 KiB", async () => {
+    // A ReadableStream body produces no content-length — the exact shape
+    // a Transfer-Encoding: chunked client produces.
+    const oversized = "x".repeat(MAX_BODY_BYTES + 1);
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "JSON_BEGIN" + oversized, // not valid JSON — 413 must win before parsing
+      duplex: "half",
+    } as RequestInit);
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: false,
+      status: 413,
+    });
+  });
+
+  it("accepts a stream body exactly AT the boundary (>, not >=)", async () => {
+    // `{"pad":"` (8) + pad + `"}` (2) = 10 + pad — pad to exactly 64 KiB.
+    const pad = MAX_BODY_BYTES - 10;
+    const exact = JSON.stringify({ pad: "y".repeat(pad) });
+    expect(exact.length).toBe(MAX_BODY_BYTES);
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: exact,
+      duplex: "half",
+    } as RequestInit);
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: true,
+      value: { pad: "y".repeat(pad) },
+    });
+  });
+
+  it("parses a stream body under the cap", async () => {
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ok: true, n: 3 }),
+      duplex: "half",
+    } as RequestInit);
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: true,
+      value: { ok: true, n: 3 },
+    });
+  });
+
+  it("returns 400 for unparseable JSON text", async () => {
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "not json at all",
+      duplex: "half",
+    } as RequestInit);
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: false,
+      status: 400,
+    });
+  });
+
+  it("returns 400 for an empty body", async () => {
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "",
+      duplex: "half",
+    } as RequestInit);
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: false,
+      status: 400,
+    });
+  });
+
+  it("parses a literal JSON null body fine (route guards non-objects)", async () => {
+    // The appointments seam and (after session-10) the login route tolerate
+    // non-object bodies with a 422 field map — readJsonBody must hand the
+    // parsed null through, never 500.
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "null",
+      duplex: "half",
+    } as RequestInit);
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: true,
+      value: null,
+    });
   });
 });

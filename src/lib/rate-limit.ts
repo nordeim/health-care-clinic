@@ -85,3 +85,58 @@ export function bodyTooLarge(request: Request): boolean {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   return Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES;
 }
+
+/* The result of a capped JSON body read: either the parsed value (ANY JSON
+ * shape — objects, null, scalars; route-level guards handle non-objects)
+ * or a failure status the caller renders. */
+export type JsonBodyResult =
+  | { ok: true; value: unknown }
+  | { ok: false; status: 413 | 400 };
+
+/** Reads and parses a JSON request body with the 64 KiB cap enforced for
+ * EVERY transport shape (session-10 F2).
+ *
+ * The content-length header is only a FAST path — a chunked request (or
+ * any stream without content-length) used to sail past the 413 gate and
+ * buffer an unbounded body in memory before `request.json()` failed. This
+ * seam stream-reads the body and aborts the moment the byte count crosses
+ * the cap (cancelling the reader releases the socket), so the memory
+ * ceiling holds no matter how the client frames the request. */
+export async function readJsonBody(request: Request): Promise<JsonBodyResult> {
+  if (bodyTooLarge(request)) {
+    return { ok: false, status: 413 };
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) {
+    // No body stream at all — indistinguishable from unparseable JSON.
+    return { ok: false, status: 400 };
+  }
+
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > MAX_BODY_BYTES) {
+      // Cancel releases the socket instead of draining an oversized body.
+      await reader.cancel().catch(() => {});
+      return { ok: false, status: 413 };
+    }
+    chunks.push(value);
+  }
+
+  const buffer = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  try {
+    return { ok: true, value: JSON.parse(new TextDecoder().decode(buffer)) };
+  } catch {
+    return { ok: false, status: 400 };
+  }
+}

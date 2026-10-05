@@ -153,3 +153,30 @@ Work Log:
 Stage Summary:
 - HTTP edge hardened (timing, keying, size, validation); a11y gaps closed; parity preserved byte-exact — 7490px and the mobile menu contract re-verified on both sites
 - Committed on main and pushed via docs/ssh_git_wrapper_v3.py; remote ref verified; key shredded
+
+---
+Task ID: 8
+Agent: Super Z (main orchestrator)
+Task: Session 10 (continuation) — body-cap bypass fix, login null-body 500, async scrypt, robustness completions, parity re-verification, SSH push
+
+Work Log:
+- git pull -> 2b7a40a (docs-only: operator pasted session-8 transcript as docs/session_9.md); node_modules re-provisioned (sandbox reset); baseline gates green (lint/tsc/65 unit/build identical routes/34 e2e)
+- Fresh-eyes audit (read-only sub-agent) + live parity verification (agent-browser, both sites, 1440x900 + 390x844): parity byte-exact (7490px; mobile panel 192x148 @ (178,80); link-click 0.0004998518957345971 BOTH — same-session same-method); methodology note recorded: agent-browser default viewport is 1280x577, set 1440x900 explicitly
+- Audit findings (all verified empirically or line-by-line): login route 500 on JSON null body (F1 — exact class session-8 fixed on the sibling route), 64KiB body cap bypassable via Transfer-Encoding chunked (F2 — verified live: 70KB chunked POST parsed to 422), scryptSync event-loop starvation under spoofed-key bursts (F3), west-of-server "today" rejection (F4), zero bodyTooLarge unit coverage (F5), e2e limiter cross-run fragility (F6), programmatic smooth scroll ignoring prefers-reduced-motion (F7), dev PII query-log note (F8)
+- Product loop re-verified under ACTIVE ambient DATABASE_URL hijack (writes in repo DB; dashboard renders them)
+- Wrote docs/remediation-plan-session10.md; executed TDD-first (Red confirmed for every phase before Green):
+  * readJsonBody seam in rate-limit.ts (8 tests: stream/chunked 413, exact 64KiB boundary, 400s, null passthrough); both routes rewired
+  * login non-object body guard -> 422 field map (e2e-pinned both routes: null/scalar never 500)
+  * async scrypt via promisify (contract test first; identical CPU on libuv threadpool; DUMMY_HASH untouched; seed + 19 auth tests await-based) — verified live: 19 health polls interleave during 5 concurrent scrypt logins
+  * timezone floor: 1 day westward tolerance (yesterday 201 / 2-days 422 verified live)
+  * src/lib/motion.ts scrollBehavior() in hero + header CTAs (e2e: test.use reducedMotion + position-stability assertion — instant jump synchronous, smooth would still animate)
+  * e2e 429/413 specs use per-run spoofed XFF keys (reuseExistingServer can no longer poison buckets)
+  * db.ts PII comment; DEPLOYMENT.md §6 stream-cap + map-growth + async-scrypt notes
+- One test-expectation correction during TDD (instant jump lands at scroll-margin offset scroll-mt-6=24px, so assert position stability not exact-target equality — code was right, assertion refined)
+- Final gate: lint 0 / tsc true-strict / 76 unit (65+11) / build identical routes / 37 e2e (34+3); live parity unchanged; F1/F2/F4 re-probed live; 11 screenshots refreshed from remediated dev server
+- Docs: session_10.md, remediation-plan-session10.md, worklog entry, SKILL.md v2.4.0, PAD [S10], README/CLAUDE/AGENTS updates
+- Committed <SHA> on main; pushed via docs/ssh_git_wrapper_v3.py (explicit --remote, paramiko shim at /home/z/my-project/bin/ssh); dry-run first; remote verified == HEAD; operator key shredded
+
+Stage Summary:
+- Repo @ <SHA> (main, pushed & remote-verified); HTTP edge fully closed (cap holds for every transport shape), login route hardened, event loop responsive under auth bursts
+- Full detail: repo worklog.md (Task ID 8) + docs/session_10.md + docs/remediation-plan-session10.md
