@@ -48,7 +48,7 @@ geometry).
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
 | 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests with status transitions (New → Confirmed → Completed via `PATCH /api/appointments/[id]`), server-guarded |
 | 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), strict server-side payload validation, and baseline security headers on every route response and app-level redirect (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, no `X-Powered-By`; the framework's internal 308 trailing-slash redirect is emitted before `headers()` applies — a documented, e2e-pinned limitation) |
-| ✅ Tested | 99 unit tests + 44 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), and the validation + timing-equalization + status seams |
+| ✅ Tested | 107 unit tests + 44 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), and the validation + timing-equalization + status + demo-seed seams |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified
@@ -135,8 +135,15 @@ bun install                # or npm install
 cp .env.example .env       # defaults: SQLite at db/custom.db
 bun run db:push            # create the schema
 bun run db:seed            # create the staff login (ADMIN_EMAIL/PASSWORD)
+SEED_DEMO=1 bun run db:seed   # optional: the 6 demo dashboard rows (dev only)
 bun run dev                # http://localhost:3000
 ```
+
+The demo seed is **opt-in** (session-28 F1): it restores the 6 realistic
+appointment rows the dashboard screenshots show (2 new / 2 confirmed /
+2 completed) — idempotently, with self-renewing future dates, and only
+rows that are valid public-API payloads by construction
+(`src/lib/seed-demo.ts`, unit-tested). Production seeding never runs it.
 
 Verify setup:
 
@@ -213,7 +220,7 @@ by the ported base layer — matching the reference exactly.
 | Desktop hero | [docs/screenshots/01-desktop-hero.png](docs/screenshots/01-desktop-hero.png) |
 | Desktop sections | [docs/screenshots/02-desktop-*.png](docs/screenshots/) |
 | Full page | [docs/screenshots/03-desktop-full.png](docs/screenshots/03-desktop-full.png) |
-| Mobile hero / menu | [docs/screenshots/04-mobile-hero.png](docs/screenshots/04-mobile-hero.png), [05-mobile-menu-open.png](docs/screenshots/05-mobile-menu-open.png) |
+| Mobile hero / menu | [docs/screenshots/04-mobile-hero.png](docs/screenshots/04-mobile-hero.png), [05-mobile-menu-open.png](docs/screenshots/05-mobile-menu-open.png), [06-mobile-services.png](docs/screenshots/06-mobile-services.png) |
 | Appointment flow | [docs/screenshots/09-appointment-form.png](docs/screenshots/09-appointment-form.png), [10-appointment-success.png](docs/screenshots/10-appointment-success.png), [14-appointment-field-errors.png](docs/screenshots/14-appointment-field-errors.png) |
 | Legal pages | [docs/screenshots/07-privacy-policy.png](docs/screenshots/07-privacy-policy.png), [08-accessibility-statement.png](docs/screenshots/08-accessibility-statement.png) |
 | Staff sign-in | [docs/screenshots/11-login-desktop.png](docs/screenshots/11-login-desktop.png) |

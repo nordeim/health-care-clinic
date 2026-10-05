@@ -3,7 +3,7 @@
 **Classification:** Internal Engineering Reference
 **Status:** DEFINITIVE, PRODUCTION-LOCKED BLUEPRINT
 **Companion Documents:** `README.md` (user-facing), `AGENTS.md` (condensed agent rules), `CLAUDE.md` (agent workflow), `docs/Tailwind-V4-Validation-Report.md` (engine trap log)
-**Last Updated:** 2026-10-05
+**Last Updated:** 2026-10-06
 **Audience:** Senior Engineers, Tech Leads, DevOps, and Onboarding Engineers
 **Rule:** Every architectural decision in this document traces to a specific rationale. Nothing is here "because it's popular."
 
@@ -27,6 +27,7 @@
 - `[S22]` Session-22 credential-hygiene closure + db-path decode hardening + doc-claim honesty (see`docs/remediation-plan-session22.md`): the fresh-eyes audit (13 findings: 4 Low, 9 Info, zero Critical/High/Medium, zero regressions) found the residual eleven prior audits hadn't — the headline a RESURRECTED credential-hygiene leak: session-16 F5 had "neutralized" the then-live password by swapping the doc example to a new realistic-looking string, but fresh bootstraps (including this session's own) adopted that example as the actual `.env` credential — a login-proven working password was committed in four living docs. Remediated root-cause-first: the live credential rotated to a generated value printed nowhere (old literal → 401), and the four doc escaping-examples switched to the OBVIOUS placeholder `$<your-password>` (escaped) so no future bootstrap can re-adopt them. Plus: db-path's module self-anchor extracted into the tested pure seam `moduleSelfRoot` with `decodeURIComponent` (a repo path with spaces/`#`/non-ASCII no longer silently skips the anchor — 4 new unit tests, TDD Red-first, suite 95 → 99); PAD ADR-009 Consequences de-staled (status transitions shipped session 16), §6.1 rule-6 floor corrected to midnight−1day (the west-of-server tolerance), ADR-002 annotated to the seven-island reality, §3.2's docs/ subtree completed with a deliberate-elision note, §4.2/§7.1/§7.3/§7.4/§11 counts updated to the 99-unit reality; SKILL §1 staff surfaces + §5 tree gained the PATCH route; AGENTS "one write path" qualified as the public one; the CLAUDE "fixed -window" typo fixed and the set-state-in-effect doc tension resolved honestly (header.tsx's invoke-once pattern documented as the sanctioned exception); seed's email-change nuance documented (upsert-by-email leaves the old row active; .env.example gained the caveat); landing.spec's overstating "smooth-scroll" title corrected; the logout-button "only interactive island" comment de-staled. E2E 43/43 + the double-run proof re-confirmed; live parity re-verified byte-exact on both sites at verified viewports (desktop 7490px both; mobile panel 192×148 @ (178,80); link-click 0.421875 both; mobile height 12162 vs 12164 = a 2px sub-pixel drift inside the contact section, recorded as an honest measurement note); pixel-rasterized trap guards green (pill ±1 oklab, dropdown exact); the full product loop with status transitions green under the still-active ambient DATABASE_URL hijack; 20 screenshots refreshed (03-desktop-full exactly 1440×7490); SKILL.md → v2.8.2.
 - `[S24]` Session-24 favicon chrome parity + PAD count residuals + script-footgun note (see `docs/remediation-plan-session24.md`): the fresh-eyes audit (13th; 5 findings: 2 Low, 3 Info, zero Critical/High/Medium, zero regressions) found the one reference-visible surface twelve prior audits never checked — the app shipped NO favicon (every icon request 404'd) while the reference serves an inline SVG one (heart-rate glyph, clinic green, via `<link rel="icon" type="image/svg+xml">`). Remediated TDD-first: a new landing.spec icon pin (Red on the 404 tree) then the reference glyph vendored verbatim as `src/app/icon.svg` (App Router file convention — the link tag auto-generated, `/icon.svg` 200 `image/svg+xml`, page height 7490px unchanged, head-only chrome); the reference's `/favicon.ico` 302→logo.png fallback deliberately NOT replicated (platform artifact serving a different image — recorded in the Validation Report's deviation log beside the session-4 title deviation, and §10 below). Plus the residuals: two "15 unit" db-path claims (ADR-004 + §3.2) corrected to 19, §11's seed.ts row re-measured (~47), AGENTS.md gained the `db:migrate`/`db:reset` placeholder note (migrations-less repo; `db:push` + `db:seed` is the workflow), and the 6 realistic dashboard seed rows restored through the public API with statuses via the real PATCH API. Unit 99 (unchanged); e2e 43 → 44 (the icon pin) with the double-run proof re-held (44/44 × 2); live parity re-verified byte-exact on both sites at verified viewports (desktop 7490px both; mobile panel 192×148 @ (178,80); link-click 0.421875 + scrollY 1837 both; mobile height 12162 vs 12164 — the documented 2px contact drift); pixel-rasterized dropdown [38,74,57,230] exact; 20 screenshots refreshed (03-desktop-full exactly 1440×7490); SKILL.md → v2.8.3.
 - `[S26]` Session-26 e2e time-erosion closure + PAD count residuals + seed-state restore (see `docs/remediation-plan-session26.md`): the fresh-eyes audit (14th; 6 findings: 4 Low, 2 Info, zero Critical/High/Medium, zero regressions) found a defect class thirteen prior audits never checked for — TIME-ERODED e2e assertions: the impossible-dates pin's hardcoded 2025 literals had fallen into the past (it is 2026), so their JS-rollover targets were past too — the "not in the past" floor alone produced the asserted 422 even with the calendar round-trip check fully broken (empirically proven by the RED-0 run: `isRealCalendarDate` forced to `valid: true`, rebuilt, and the old test still passed — the tautology was real). Remediated TDD-first: the pin now computes `new Date().getFullYear() + 1` literals, whose rollover targets are always future so ONLY the round-trip check can reject them (self-renewing — the class cannot recur); the new pin was proven RED against the same deliberately-broken seam (201 ≠ 422 → fail) before going GREEN on the restored one, with the seam patch reverted verbatim (`git diff` clean) and the RED run's persisted garbage row purged from `db/e2e.db`. Plus: §7.1's landing row corrected 12 → 13 (the session-24 count pass updated every 44-total but missed the per-spec breakdown — the rows summed to 43 against this document's own 44; the missed-sibling-row class), §11's Validation Report row re-measured ~334 → ~361 (stale since session-24 appended 27 lines to that file without re-measuring), §3.2's transcript ranges rephrased as open-ended families (`session_*.md` / `remediation-plan-session*.md` — kills the every-session stale-range class at the root), SKILL §8's forms row reworded to the honest two-form reality (`<label>` wrapping on the staff login; `aria-label` on the public appointment form — a verbatim parity port), and the 6 realistic dashboard seed rows restored through the public API (unique 198.51.117-119.x XFF keys) with statuses via the real PATCH API (2 confirmed / 2 new / 2 completed — the third recurrence of the workspace-reset class). Unit 99 (unchanged); e2e 44 (unchanged) + the double-run proof re-held (44/44 × 2); live parity re-verified byte-exact on both sites at verified viewports (desktop 7490px both; mobile panel 192×148 @ (178,80); link-click 0.421875 + scrollY 1837 both; the documented 2px contact drift); pixel-rasterized dropdown [38,74,57,230] exact; the full product loop with status transitions green under the still-active ambient hijack; 20 screenshots refreshed (03-desktop-full exactly 1440×7490; dashboards show the restored 6 seed rows); SKILL.md → v2.8.4.
+- `[S28]` Session-28 demo-seed root-cause closure + screenshot index + lock metadata (see `docs/remediation-plan-session28.md`): the fresh-eyes audit (15th; 3 findings: 1 Low, 2 Info, zero Critical/High/Medium, zero regressions) found the 6 realistic dashboard seed rows absent AGAIN — the 4th recurrence of the workspace-reset class (S20, S24, S26 each restored them through the public API by hand, and every fresh bootstrap erased them again). Remediated at the ROOT: `scripts/seed.ts` gained an OPT-IN demo mode (`SEED_DEMO=1` or `--demo`; default behavior byte-identical so production seeding per DEPLOYMENT.md §4 never creates patient rows) backed by the new pure seam `src/lib/seed-demo.ts` — 6 rows (2 new / 2 confirmed / 2 completed), specialties/statuses members of the API's derived allowlists, SELF-RENEWING dates (now + offsetDays — the session-26 F4 anti-erosion doctrine applied to seed data), every row a valid public-API payload by construction (the cross-seam test pushes each through validateAppointmentPayload), idempotent inserts (skip-if-exists by fullName — never duplicates, never clobbers real dashboard transitions). TDD Red-first (8 new unit cases failing on the missing module before landing; 99 → 107). Plus: README's Screenshots table gained the unreferenced 06-mobile-services.png row, and bun.lock's root workspace name corrected orbital → health-care-clinic with an install-stability proof. Count-alignment pass: every live unit-count reference 99 → 107 across README/CLAUDE×2/PAD×3/SKILL; §3.2 tree + §7.1 breakdown + §11 rows re-measured; deps pin untouched (scripts/ = seed.ts). E2E 44/44 × 2 (double-run proof); live parity re-verified byte-exact on both sites at verified viewports (desktop 7490px both; mobile panel 192×148 @ (178,80); link-click 0.421875 + scrollY 1837 both; rasterized dropdown [38,74,57,230] exact, pill [37,74,57,204] ±1 oklab); the full product loop green under the still-active ambient hijack; 20 screenshots refreshed (03-desktop-full exactly 1440×7490; dashboards show the restored 6 seed rows); SKILL.md → v2.8.5.
 
 ---
 
@@ -373,11 +374,12 @@ health-care-clinic/
 │       ├── auth.ts                  ← scrypt + HMAC session primitives (unit-tested)
 │       ├── validation.ts            ← appointment + status validation seams (unit-tested)
 │       ├── rate-limit.ts            ← XFF keying, fixed-window limiter, 64 KiB body cap (unit-tested)
+│       ├── seed-demo.ts             ← demo-row builder seam (unit-tested — session-28 F1)
 │       ├── motion.ts                ← reduced-motion-aware scroll behavior
 │       ├── db.ts                    ← Prisma singleton with env-resolved URL
 │       └── db-path.ts               ← pure URL resolution (unit-tested)
 ├── prisma/schema.prisma             ← Appointment (incl. status + updatedAt) + AdminUser models
-├── scripts/seed.ts                  ← db:seed staff upsert (scrypt hash) — the ONLY script
+├── scripts/seed.ts                  ← db:seed staff upsert (scrypt hash) — the ONLY script; opt-in `SEED_DEMO=1`/`--demo` mode also restores the 6 demo dashboard rows (session-28 F1)
 ├── tests/
 │   ├── db-path.test.ts              ← 19 unit cases (Vitest)
 │   ├── auth.test.ts                 ← 19 unit cases (Vitest)
@@ -385,6 +387,7 @@ health-care-clinic/
 │   ├── validation.test.ts           ← 27 unit cases (Vitest)
 │   ├── rate-limit.test.ts           ← 20 unit cases (Vitest)
 │   ├── status.test.ts               ← 10 unit cases (Vitest)
+│   ├── seed-demo.test.ts            ← 8 unit cases (Vitest — session-28 F1)
 │   └── e2e/                         ← 44 tests (Playwright)
 │       ├── global-setup.ts          ← pushes schema to db/e2e.db + seeds admin
 │       ├── mobile-navigation.spec.ts ← chrome contract + trap guards
@@ -669,7 +672,7 @@ end-to-end.
 
 | Category | Files | Tests | Location | Framework |
 | -------- | ----- | ----- | -------- | --------- |
-| Unit (pure seams) | 6 | 99 | `tests/db-path.test.ts` (19, incl. moduleSelfRoot decode), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin), `tests/status.test.ts` (10: allowlist derivation, case-sensitivity, type tightening, non-object tolerance) | Vitest |
+| Unit (pure seams) | 7 | 107 | `tests/db-path.test.ts` (19, incl. moduleSelfRoot decode), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin), `tests/status.test.ts` (10: allowlist derivation, case-sensitivity, type tightening, non-object tolerance), `tests/seed-demo.test.ts` (8: the 6-row contract, 2/2/2 split, derived allowlist membership, self-renewing dates, purity, cross-seam validity — session-28 F1) | Vitest |
 | E2E chrome contract | 1 | 7 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
 | E2E landing parity | 1 | 13 | `tests/e2e/landing.spec.ts` (incl. title + tel: pins, reduced-motion instant-jump pin, baseline security-header pin, SVG-favicon chrome pin) | Playwright |
 | E2E write path | 1 | 10 | `tests/e2e/appointment-form.spec.ts` (incl. 422 UI, 429, 413, impossible dates, non-object body, curated transport-failure message) | Playwright |
@@ -689,14 +692,14 @@ end-to-end.
 ### 7.3 Coverage Thresholds
 
 No numeric threshold configured (content-rendering app; the meaningful
-coverage is the parity surface). The gate is pass/fail: 99/99 unit,
+coverage is the parity surface). The gate is pass/fail: 107/107 unit,
 44/44 e2e.
 
 ### 7.4 Pre-Push Checklist
 
 - [ ] `bun run lint` — 0 errors (strengthened ruleset: 14 correctness rules ON, documented offs only — session-12 F3 + session-16 F3)
 - [ ] `bun run typecheck` — clean (true strict)
-- [ ] `bun run test` — 99/99 (db-path 19 + auth 19 + deps 4 + validation 27 + rate-limit 20 + status 10)
+- [ ] `bun run test` — 107/107 (db-path 19 + auth 19 + deps 4 + validation 27 + rate-limit 20 + status 10 + seed-demo 8)
 - [ ] `bun run build` — standalone output produced (types enforced — no ignoreBuildErrors)
 - [ ] `bun run test:e2e` — 44/44 (requires the build)
 - [ ] `git status` clean of secrets/artifacts before commit
@@ -748,6 +751,7 @@ bun install
 cp .env.example .env
 bun run db:push
 bun run db:seed      # staff login for /login + /dashboard (ADMIN_EMAIL/PASSWORD)
+SEED_DEMO=1 bun run db:seed   # optional, dev only: +6 demo dashboard rows
 bun run dev            # verify: curl localhost:3000/api/health
 ```
 
@@ -814,7 +818,9 @@ bun run dev            # verify: curl localhost:3000/api/health
 | `src/app/api/appointments/route.ts` | ~82 | Validation seam call, rate limiting, persistence |
 | `src/app/api/auth/login/route.ts` | ~130 | Credential verify, session cookie, login limiter |
 | `src/app/dashboard/page.tsx` | ~286 | Session-guarded stats + appointments table with status transitions (RSC) |
-| `scripts/seed.ts` | ~47 | db:seed staff account upsert |
+| `scripts/seed.ts` | ~96 | db:seed staff upsert + opt-in demo-row mode (session-28 F1) |
+| `src/lib/seed-demo.ts` | ~132 | Demo-row builder seam: 6 rows, 2/2/2 split, self-renewing dates (unit-tested) |
+| `tests/seed-demo.test.ts` | ~131 | The demo-seam unit contract (8 cases — session-28 F1) |
 | `src/lib/db-path.ts` | ~135 | Pure SQLite URL resolution (tested seam, incl. moduleSelfRoot decode) |
 | `tests/e2e/mobile-navigation.spec.ts` | ~170 | Chrome contract + Tailwind v4 trap guards |
 | `tests/e2e/auth.spec.ts` | ~263 | Full auth loop incl. public-form→dashboard visibility + browser-login key injection |

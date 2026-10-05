@@ -142,10 +142,14 @@ non-obvious-rules list; this file holds the reasoning.
   (`tests/rate-limit.test.ts`, 20 cases: last-token XFF keying, window
   expiry, max boundary, the stream-read 64 KiB body cap including the
   chunked/no-content-length shape and the exact boundary, transport-error
-  tolerance, the bodyless-request pin), and the status-update seam
+  tolerance, the bodyless-request pin), the status-update seam
   (`tests/status.test.ts`, 10 cases: allowlist derived from content.ts,
   case-sensitivity, present-but-non-string rejection, non-object body
-  tolerance, missing-status requirement).
+  tolerance, missing-status requirement), and the demo-seed seam
+  (`tests/seed-demo.test.ts`, 8 cases: the 6-row contract, the 2/2/2
+  status split, specialty/status allowlist membership, self-renewing
+  date derivation, purity, cross-seam validity through
+  validateAppointmentPayload, field bounds — session-28 F1).
 - **E2E (Playwright):** six spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
@@ -248,7 +252,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  99/99 unit, build OK, 44/44 e2e).
+  107/107 unit, build OK, 44/44 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

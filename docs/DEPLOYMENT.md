@@ -74,6 +74,10 @@ standalone trace rely on.
     ADMIN_PASSWORD='<strong password>' bun run db:seed
   ```
 
+- Do NOT set `SEED_DEMO=1` in production: the demo mode (session-28 F1)
+  additionally inserts 6 fake patient rows for the dev dashboard demo —
+  it is opt-in precisely so production seeding never creates them.
+
 - The `appointments` and `admin_users` tables are the only state; back
   them up by copying the file (SQLite single-writer: stop the server during
   the copy, or use `sqlite3 ... ".backup ..."`).

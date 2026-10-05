@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14, 16, 18, 20, 22, 24 and 26.
-version: 2.8.4
+  12, 14, 16, 18, 20, 22, 24, 26 and 28.
+version: 2.8.5
 last_updated: 2026-10-06
-project_state: 99 unit tests + 44 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past)
+project_state: 107 unit tests + 44 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); demo-seed closed at the root (session-28 F1: `SEED_DEMO=1 bun run db:seed` / `--demo` restores the 6 realistic dashboard rows — opt-in so production seeding never creates patient rows, idempotent (skip-if-exists by fullName — re-runs never duplicate or clobber real status transitions), self-renewing dates (now + offsetDays — the S26 F4 anti-erosion doctrine applied to seed data), specialties/statuses from the API's derived allowlists, every row a valid public-API payload by construction via the unit-tested src/lib/seed-demo.ts seam — the 4×-recurred workspace-reset seed-row class is dead); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -102,6 +102,9 @@ bun install
 cp .env.example .env          # then set AUTH_SECRET + ADMIN_* values
 bun run db:push               # schema -> db/custom.db
 bun run db:seed               # staff account upsert (scrypt-hashed)
+SEED_DEMO=1 bun run db:seed   # optional: 6 demo dashboard rows (dev only —
+                              # session-28 F1: opt-in, idempotent, self-renewing
+                              # dates, valid API payloads by construction)
 bun run dev                   # http://localhost:3000 (logs to dev.log)
 ```
 
@@ -198,7 +201,11 @@ src/lib/rate-limit.ts        clientKey + fixed-window limiter + body cap (pure)
 src/lib/db.ts                Prisma singleton (globalThis in dev)
 src/lib/db-path.ts           SQLite URL resolution (pure, tested)
 scripts/seed.ts              db:seed staff upsert (the ONLY script — the
-                             ORBITAL-era probe scripts were removed in S6)
+                             ORBITAL-era probe scripts were removed in S6);
+                             opt-in SEED_DEMO=1/--demo mode restores the 6
+                             demo dashboard rows (session-28 F1)
+src/lib/seed-demo.ts          demo-row builder seam (pure, unit-tested —
+                             self-renewing dates, derived specialties)
 ```
 
 **Client-island discipline:** Server Components by default; `"use client"`
@@ -348,8 +355,9 @@ API calls surface there. API failures log structured messages
 ```bash
 bun run lint          # 0 errors
 bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
-bun run test          # 99/99 (db-path 19 + auth 19 + deps 4 +
-                      #  validation 27 + rate-limit 20 + status 10)
+bun run test          # 107/107 (db-path 19 + auth 19 + deps 4 +
+                      #  validation 27 + rate-limit 20 + status 10 +
+                      #  seed-demo 8)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
 bun run test:e2e      # 44/44 (6 spec files)
@@ -916,3 +924,39 @@ ad-hoc Prisma query without `env -u` failed with SQLite error 14 exactly as
 ADR-010 documents); 20 screenshots refreshed (03-desktop-full exactly
 1440×7490; dashboards show the restored 6 seed rows; the capture's
 submission rows purged after).
+
+### [S28] Session 28 — demo-seed root-cause closure, screenshot index, lock metadata
+
+The 15th fresh-eyes audit (3 findings: 1 Low, 2 Info, zero
+Critical/High/Medium, zero regressions). The headline closed the
+4×-recurred workspace-reset seed-row class at its ROOT: the 6 realistic
+dashboard rows were absent again (S20, S24, S26, S28 — each prior session
+restored them through the public API by hand, and every fresh bootstrap
+erased them again). `scripts/seed.ts` gained an OPT-IN demo mode
+(`SEED_DEMO=1` env or `--demo` argv — default behavior byte-identical, so
+production seeding per DEPLOYMENT.md §4 never creates patient rows),
+backed by the new pure seam `src/lib/seed-demo.ts` (6 rows, 2 new /
+2 confirmed / 2 completed; specialties/statuses members of the API's
+derived allowlists; self-renewing dates now + offsetDays — the S26 F4
+anti-erosion doctrine applied to seed data; every row a valid
+public-API payload BY CONSTRUCTION — the cross-seam unit test pushes each
+row through validateAppointmentPayload) with IDEMPOTENT inserts
+(skip-if-exists by fullName — re-runs never duplicate and never clobber
+real dashboard status transitions). TDD Red-first (8 new unit cases
+failing on the missing module before the seam landed; suite 99 → 107).
+Plus: README's Screenshots table gained the unreferenced
+06-mobile-services.png row (the 20th committed capture), and bun.lock's
+root workspace name corrected orbital → health-care-clinic with an
+install-stability proof (the lock stays canonical; `bun install` reports
+no changes). Count-alignment pass: 99 → 107 across README/CLAUDE×2/
+PAD×3/SKILL; deps pin untouched (scripts/ = seed.ts — the flag extends
+the file, no second script). E2E 44/44 × 2 (double-run proof re-held);
+live parity re-verified byte-exact on both sites at verified viewports
+(desktop 7490px both; mobile panel 192×148 @ (178,80) grid r24 p8;
+link-click 0.421875 + scrollY 1837 BOTH; pill [37,74,57,204] ±1 oklab,
+dropdown [38,74,57,230] exact; mobile height 12162 vs 12164 — the
+documented 2px contact drift); the full product loop with status
+transitions green under the still-active ambient DATABASE_URL hijack;
+20 screenshots refreshed (03-desktop-full exactly 1440×7490; dashboards
+show the restored 6 seed rows; the capture's submission row purged
+after).

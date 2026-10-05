@@ -19,7 +19,7 @@ the log tails, never by the wrapper's exit status.
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
 | E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 44 tests) |
 | DB schema | `bun run db:push` (Prisma; SQLite at `db/custom.db`) |
-| Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) |
+| Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) — add `SEED_DEMO=1` (or `-- --demo`) to ALSO restore the 6 demo dashboard rows (opt-in, idempotent, dev-only; default seeding never creates patient rows — session-28 F1) |
 | Production | `bun run build && bun .next/standalone/server.js` |
 
 NOTE (session-24 F3): `db:migrate` / `db:reset` (further down the scripts
