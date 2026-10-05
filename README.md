@@ -48,7 +48,7 @@ geometry).
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
 | 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests, server-guarded |
 | 🛡️ Abuse controls | Per-IP fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login) and strict server-side payload validation |
-| ✅ Tested | 29 unit tests + 28 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, and the full auth loop |
+| ✅ Tested | 33 unit tests + 28 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, a dependency-contract pin, and the full auth loop |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified

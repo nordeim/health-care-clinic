@@ -117,9 +117,12 @@ non-obvious-rules list; this file holds the reasoning.
 ## Testing Strategy
 
 - **Unit (Vitest):** pure seams only — the SQLite URL resolution contract
-  (`tests/db-path.test.ts`, 15 cases) and the staff-auth crypto contract
+  (`tests/db-path.test.ts`, 15 cases), the staff-auth crypto contract
   (`tests/auth.test.ts`, 14 cases: scrypt round-trips, salt uniqueness,
-  HMAC tamper/expiry rejection, env fallback rules).
+  HMAC tamper/expiry rejection, env fallback rules), and the dependency
+  contract (`tests/deps.test.ts`, 4 cases: runtime/dev allowlist set
+  equality, no removed scaffold package creeps back, `scripts/` holds only
+  `seed.ts`).
 - **E2E (Playwright):** five spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll), `appointment-form`
@@ -201,7 +204,7 @@ reference copy today). Do not inline copy edits into components.
 
 ## Success Metrics
 
-- Verification gate green (lint 0, tsc 0, 29/29 unit, build OK, 28/28 e2e).
+- Verification gate green (lint 0, tsc 0, 33/33 unit, build OK, 28/28 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

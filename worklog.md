@@ -109,3 +109,22 @@ Stage Summary:
 - Session-2 remediation held up under re-audit; residuals were doc-grade, all fixed
 - Parity with https://health-care-clinic.base44.app/ re-verified live at heading/geometry/color/behavior level
 - Committed on main and pushed via docs/ssh_git_wrapper_v3.py; remote ref verified; key shredded
+
+---
+Task ID: 6
+Agent: Super Z (main orchestrator)
+Task: Session 6 — scaffold cleanup, dependency hygiene, parity re-verification, push
+
+Work Log:
+- Refreshed workspace via git pull to 9092858 (docs-only: operator pasted session-4 transcript as docs/session_5.md); read all root docs + session logs 4/5 + remediation-plan-session4; validated claims against the tree; environment intact from session 4
+- Baseline gates all green before changes: lint 0 / tsc / 29 unit / build (identical route table) / 28 e2e
+- Audit emphasis on the un-surfaced scaffold legacy: git archaeology traced 14 scripts/ files to pre-clone commit 5384a0c (ORBITAL/project-management era — they reference /home/z/my-project/project-management which doesn't exist); full import inventory proved 15 dependencies unused (8x @radix-ui, cva, clsx, tailwind-merge, tailwindcss-animate, tw-animate-css, zustand, z-ai-web-dev-sdk) + dead components.json; found committed ssh shims violating the runbook's own "never commit the shim" rule
+- Live parity verification (agent-browser, both sites, 1440x900 + 390x844): 7490px both, h2/h3 identical; mobile panel byte-exact (192x148 @ top 80/right 370, grid, r24, p8, oklab paint, 3 links); link-click closes + jumps to identical servicesTop 0.421875; reference /login still platform-404; dashboard ref image still 404 on GitHub — ADR-009 remains the correct fulfillment
+- Product loop re-verified under an ACTIVE ambient DATABASE_URL hijack value: POST -> 201 -> row in <repo>/db/custom.db (env -u guards held) -> row + stats on the authenticated dashboard
+- Wrote docs/remediation-plan-session6.md; validated against codebase; executed: removed 14 scripts + 15 deps + components.json + 2 ssh shims; regenerated lockfile; added tests/deps.test.ts dependency-contract pin (4 tests, 29 -> 33 unit)
+- Post-cleanup gate: lint 0 / tsc / 33 unit / build identical routes / 28 e2e; fresh dev boot + parity spot-checks unchanged; product loop green; 9 screenshots re-captured at exact viewports
+- Session docs: session_6.md, this entry, SKILL.md v2.2.0, PAD [S6], README/CLAUDE count fixes
+
+Stage Summary:
+- Cleanup proven behavior-neutral end-to-end; install surface minus 15 packages + 16 dead files
+- Committed on main and pushed via docs/ssh_git_wrapper_v3.py; remote ref verified; key shredded

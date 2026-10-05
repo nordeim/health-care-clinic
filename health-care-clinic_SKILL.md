@@ -7,10 +7,10 @@ description: >
   dependency-free staff auth/dashboard extension. Captures the
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
-  methodology, and every hard-won lesson from sessions 1, 2 and 4.
-version: 2.1.0
+  methodology, and every hard-won lesson from sessions 1, 2, 4 and 6.
+version: 2.2.0
 last_updated: 2026-10-05
-project_state: 29 unit tests + 28 e2e tests green; env-leak guard active (env -u)
+project_state: 33 unit tests + 28 e2e tests green; scaffold cleaned (scripts/ = seed.ts only, zero unused deps); env-leak guard active (env -u)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -178,7 +178,8 @@ src/lib/content.ts           ALL copy, icon maps, nav contracts (as const)
 src/lib/auth.ts              scrypt + HMAC session primitives (pure)
 src/lib/db.ts                Prisma singleton (globalThis in dev)
 src/lib/db-path.ts           SQLite URL resolution (pure, tested)
-scripts/seed.ts              db:seed staff upsert
+scripts/seed.ts              db:seed staff upsert (the ONLY script — the
+                             ORBITAL-era probe scripts were removed in S6)
 ```
 
 **Client-island discipline:** Server Components by default; `"use client"`
@@ -323,7 +324,7 @@ API calls surface there. API failures log structured messages
 ```bash
 bun run lint          # 0 errors
 bun run typecheck     # clean
-bun run test          # 29/29 (db-path 15 + auth 14)
+bun run test          # 33/33 (db-path 15 + auth 14 + deps 4)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
 bun run test:e2e      # 28/28 (5 spec files)
@@ -559,3 +560,15 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   report and pinned with `toHaveTitle` e2e assertions (28 e2e total);
   braces/deepmerge-ts advisories re-verified unfixable upstream
   (accepted dev-time risk); key screenshots refreshed.
+- **Session 6** (scaffold cleanup): audit surfaced the pre-clone legacy —
+  14 ORBITAL-era scripts removed from `scripts/` (kept `seed.ts`), 15
+  unused scaffold dependencies removed (8× @radix-ui, cva, clsx,
+  tailwind-merge, tailwindcss-animate, tw-animate-css, zustand,
+  z-ai-web-dev-sdk) + the dead `components.json`, and the two committed ssh
+  shims that violated the push runbook's "never commit the shim" rule.
+  The removal is pinned by `tests/deps.test.ts` (dependency allowlist +
+  no-creep-back + scripts-dir contract) — unit suite 29 → 33. Live parity
+  re-verified byte-exact both sides before and after the cleanup; product
+  loop re-verified under an active ambient `DATABASE_URL` hijack value
+  (the `env -u` guards held). Cleanup proven behavior-neutral: identical
+  build route table, 28/28 e2e, 9 screenshots refreshed.

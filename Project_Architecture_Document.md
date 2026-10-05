@@ -16,6 +16,7 @@
 - `[SR]` Trap log cross-referenced with `docs/Tailwind-V4-Validation-Report.md` (five documented v3→v4 engine variances, all mitigated in this codebase).
 - `[S2]` Session-2 audit + remediation (see `docs/remediation-plan-session2.md`): ADR-008..010 recorded — dependency-free cookie session auth, the staff dashboard beyond-parity extension, and the `env -u DATABASE_URL` determinism guard. `.env.example` rewritten to match the codebase; `db:seed` added; auth unit + e2e layers added (29 unit / 27 e2e total).
 - `[S4]` Session-4 re-audit (see `docs/remediation-plan-session4.md`): live parity re-verified against the reference (7490px, heading scales, mobile menu panel byte-exact); the annotated tree below brought up to date with the session-2 surfaces; the semantic-`<title>` deviation from the reference's `"Base44 APP"` platform placeholder recorded in the validation report and pinned by `toHaveTitle` e2e assertions (28 e2e); `braces`/`deepmerge-ts` advisories re-verified unfixable upstream (accepted dev-time risk); SKILL.md destructive-token typo corrected.
+- `[S6]` Session-6 scaffold cleanup (see `docs/remediation-plan-session6.md`): the pre-clone legacy removed — 14 ORBITAL-era scripts out of `scripts/` (kept `seed.ts`), 15 unused scaffold dependencies (8× @radix-ui, cva, clsx, tailwind-merge, tailwindcss-animate, tw-animate-css, zustand, z-ai-web-dev-sdk) plus the dead shadcn `components.json`, and the two committed ssh shims that violated the push runbook's "never commit the shim" rule. The dependency allowlist is now pinned by `tests/deps.test.ts` (unit suite 29 → 33). Cleanup proven behavior-neutral: identical build route table, 28/28 e2e, live parity byte-exact before and after; product loop re-verified under an active ambient `DATABASE_URL` hijack value.
 
 ---
 
@@ -355,10 +356,11 @@ health-care-clinic/
 │       ├── db.ts                    ← Prisma singleton with env-resolved URL
 │       └── db-path.ts               ← pure URL resolution (unit-tested)
 ├── prisma/schema.prisma             ← Appointment + AdminUser models
-├── scripts/seed.ts                  ← db:seed staff upsert (scrypt hash)
+├── scripts/seed.ts                  ← db:seed staff upsert (scrypt hash) — the ONLY script
 ├── tests/
 │   ├── db-path.test.ts              ← 15 unit cases (Vitest)
 │   ├── auth.test.ts                 ← 14 unit cases (Vitest)
+│   ├── deps.test.ts                 ← 4 unit cases (Vitest) — dependency contract pin
 │   └── e2e/                         ← 28 tests (Playwright)
 │       ├── global-setup.ts          ← pushes schema to db/e2e.db + seeds admin
 │       ├── mobile-navigation.spec.ts ← chrome contract + trap guards
@@ -608,7 +610,7 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 
 | Category | Files | Tests | Location | Framework |
 | -------- | ----- | ----- | -------- | --------- |
-| Unit (pure seams) | 2 | 29 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (14) | Vitest |
+| Unit (pure seams) | 3 | 33 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (14), `tests/deps.test.ts` (4) | Vitest |
 | E2E chrome contract | 1 | 7 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
 | E2E landing parity | 1 | 9 | `tests/e2e/landing.spec.ts` (incl. title pin) | Playwright |
 | E2E write path | 1 | 4 | `tests/e2e/appointment-form.spec.ts` | Playwright |
@@ -627,14 +629,14 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 ### 7.3 Coverage Thresholds
 
 No numeric threshold configured (content-rendering app; the meaningful
-coverage is the parity surface). The gate is pass/fail: 29/29 unit,
+coverage is the parity surface). The gate is pass/fail: 33/33 unit,
 28/28 e2e.
 
 ### 7.4 Pre-Push Checklist
 
 - [ ] `bun run lint` — 0 errors
 - [ ] `bun run typecheck` — clean
-- [ ] `bun run test` — 29/29
+- [ ] `bun run test` — 33/33 (db-path 15 + auth 14 + deps 4)
 - [ ] `bun run build` — standalone output produced
 - [ ] `bun run test:e2e` — 28/28 (requires the build)
 - [ ] `git status` clean of secrets/artifacts before commit
