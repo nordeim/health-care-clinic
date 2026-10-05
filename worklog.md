@@ -86,3 +86,26 @@ Work Log:
 Stage Summary:
 - Deliverable pushed to git@github.com:nordeim/health-care-clinic.git @ 341a908
 - All user requirements fulfilled: clone built + mobile nav verified against reference + Tailwind v4 traps mitigated + screenshots + 4 markdown docs + SSH push
+
+---
+Task ID: 5
+Agent: Super Z (main orchestrator)
+Task: Session 4 — re-audit, live parity re-verification, doc alignment, push
+
+Work Log:
+- Re-cloned the repo (sandbox reset) to 3b549b1; read all root docs + session logs (1/2/3) + remediation-plan-session2; validated claims against the tree
+- Rebuilt the environment from scratch: .env with operator credentials + generated AUTH_SECRET, bun install, db:push, db:seed -> db/custom.db at repo root (no ambient DATABASE_URL in this session's shell; env -u guards verified present)
+- Baseline gates: lint 0 / tsc clean / 29 unit / build OK / 27 e2e — all green before any change
+- Audited all session-2 code (auth seam, login/logout routes, login/dashboard pages, client islands, seed, global-setup, configs) — conforms to documented doctrine
+- Live parity verification with agent-browser on BOTH the reference and the local clone (1440x900 + 390x844): page height 7490px both; h2 60px/63px w400, h3 20px/25px w400 identical; FAQ/footer/CTA copy identical; legal pages structurally identical
+- MOBILE NAVIGATION (operator key concern) verified byte-exact: dropdown panel 192x148 @ top 80, display grid, radius 24px, padding 8px, paint rgba(38,74,57,.9) on BOTH sites (clone computes the oklab equivalent — documented v4 format variance); ARIA contract, link-click closes+jumps to anchor, Escape/outside-click close — verified in-browser AND pinned by 7 e2e specs
+- Product loop re-verified: login with operator credentials -> dashboard; POST /api/appointments -> 201 -> row in <repo>/db/custom.db -> row + stats on the authenticated dashboard; no hydration/page errors in dev.log
+- Findings (docs/remediation-plan-session4.md): F1 SKILL.md §19 wrong destructive token (code+reference say hsl(0 72% 52%)); F2 title deviation (reference title is the Base44 placeholder "Base44 APP"; clone uses semantic titles) unrecorded+unpinned; F3 braces/deepmerge-ts advisories unfixable upstream (braces 3.0.3 IS the latest published version — override experiment failed and was reverted); F4/F5 screenshots + bookkeeping
+- Remediation executed: validation-report deviation record appended; toHaveTitle pins added to landing.spec.ts (+1 test) and legal-pages.spec.ts (+2 assertions) -> 28/28 e2e green; SKILL.md token fix + title-deviation note + v2.1.0 + Appendix B session-4 entry; PAD revision block [S4] + stale annotated tree brought up to date with session-2 surfaces + test-distribution table corrected; CLAUDE.md "22 specs" and README "27 e2e" counts corrected
+- Screenshots re-captured (9 states) from the dev server: 01/03 desktop, 04/05 mobile hero+menu, 09/10 appointment form+success, 11 login, 12/13 dashboard desktop+mobile (initially landed in the agent-browser daemon cwd — moved into docs/screenshots)
+- Final gate: lint 0 / tsc clean / 29 unit / build OK / 28 e2e; git status clean of secrets (.env, db/*.db, dev.log excluded)
+
+Stage Summary:
+- Session-2 remediation held up under re-audit; residuals were doc-grade, all fixed
+- Parity with https://health-care-clinic.base44.app/ re-verified live at heading/geometry/color/behavior level
+- Committed on main and pushed via docs/ssh_git_wrapper_v3.py; remote ref verified; key shredded

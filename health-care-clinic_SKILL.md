@@ -7,10 +7,10 @@ description: >
   dependency-free staff auth/dashboard extension. Captures the
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
-  methodology, and every hard-won lesson from sessions 1 and 2.
-version: 2.0.0
+  methodology, and every hard-won lesson from sessions 1, 2 and 4.
+version: 2.1.0
 last_updated: 2026-10-05
-project_state: 29 unit tests + 27 e2e tests green; env-leak guard active (env -u)
+project_state: 29 unit tests + 28 e2e tests green; env-leak guard active (env -u)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -50,6 +50,11 @@ so the public experience stays byte-faithful, with `robots: noindex`.
 `/accessibility-statement`, `POST /api/appointments`, `GET /api/health`.
 **Staff surfaces:** `/login`, `/dashboard`, `POST /api/auth/login`,
 `POST /api/auth/logout`.
+
+**Recorded title deviation:** the reference's `<title>` is the Base44
+platform placeholder `"Base44 APP"`; this repo deliberately uses semantic
+per-route titles (SEO/a11y win over a platform artifact — recorded in the
+validation report, pinned by `toHaveTitle` e2e assertions).
 
 ---
 
@@ -321,7 +326,7 @@ bun run typecheck     # clean
 bun run test          # 29/29 (db-path 15 + auth 14)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
-bun run test:e2e      # 27/27 (5 spec files)
+bun run test:e2e      # 28/28 (5 spec files)
 ```
 
 Manual smoke: mobile menu open → link click (closes + jumps) → Escape
@@ -485,7 +490,7 @@ foreground/primary/ring `hsl(151 32% 22%)`; primary-foreground
 `hsl(50 58% 88%)`; hero-foreground `hsl(0 0% 100%)`; secondary
 `hsl(49 62% 82%)`; card `hsl(54 38% 98%)`; muted `hsl(203 28% 90%)`;
 muted-foreground `hsl(153 18% 35%)`; accent `hsl(205 42% 91%)`;
-border/input `hsl(151 18% 78%)`; destructive `hsl(0 84% 60%)`.
+border/input `hsl(151 18% 78%)`; destructive `hsl(0 72% 52%)`.
 Service gradient: top `hsl(48 33% 96%)`, middle `hsl(3 27% 89%)`, bottom
 `hsl(41 88% 70%)`; provider-panel `hsl(0 0% 100%)`. A `.dark` token set
 exists but has NO toggle (mirrors the reference exactly).
@@ -546,3 +551,11 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   found the ambient-env DB hijack, stale `.env.example`, and the
   login/dashboard gap; remediated with ADR-008/009/010; 29 unit + 27 e2e
   green; screenshots refreshed + auth/dashboard captures added.
+- **Session 4** (re-audit): live parity re-verified against the reference
+  (7490px height, heading scales, mobile menu panel byte-exact at
+  192×148/rgba(38,74,57,.9)); audit found only doc-level residuals —
+  destructive token typo in §19 fixed, the semantic-title deviation from
+  the reference's "Base44 APP" placeholder recorded in the validation
+  report and pinned with `toHaveTitle` e2e assertions (28 e2e total);
+  braces/deepmerge-ts advisories re-verified unfixable upstream
+  (accepted dev-time risk); key screenshots refreshed.

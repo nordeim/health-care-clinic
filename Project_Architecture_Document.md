@@ -15,6 +15,7 @@
 - `[SR]` ADR-001..007 recorded: framework, rendering strategy, styling engine port, DB/ORM, API validation, reveal choreography, e2e trap guards.
 - `[SR]` Trap log cross-referenced with `docs/Tailwind-V4-Validation-Report.md` (five documented v3→v4 engine variances, all mitigated in this codebase).
 - `[S2]` Session-2 audit + remediation (see `docs/remediation-plan-session2.md`): ADR-008..010 recorded — dependency-free cookie session auth, the staff dashboard beyond-parity extension, and the `env -u DATABASE_URL` determinism guard. `.env.example` rewritten to match the codebase; `db:seed` added; auth unit + e2e layers added (29 unit / 27 e2e total).
+- `[S4]` Session-4 re-audit (see `docs/remediation-plan-session4.md`): live parity re-verified against the reference (7490px, heading scales, mobile menu panel byte-exact); the annotated tree below brought up to date with the session-2 surfaces; the semantic-`<title>` deviation from the reference's `"Base44 APP"` platform placeholder recorded in the validation report and pinned by `toHaveTitle` e2e assertions (28 e2e); `braces`/`deepmerge-ts` advisories re-verified unfixable upstream (accepted dev-time risk); SKILL.md destructive-token typo corrected.
 
 ---
 
@@ -324,7 +325,11 @@ health-care-clinic/
 │   │   ├── page.tsx                 ← landing composition (Header → Footer)
 │   │   ├── api/
 │   │   │   ├── appointments/route.ts ← POST: validate → limit → persist
+│   │   │   ├── auth/login/route.ts   ← POST: scrypt verify + session cookie
+│   │   │   ├── auth/logout/route.ts  ← POST: clear session cookie
 │   │   │   └── health/route.ts      ← GET: SELECT 1 probe
+│   │   ├── login/page.tsx           ← staff sign-in (unlinked, noindex)
+│   │   ├── dashboard/page.tsx       ← session-guarded RSC: stats + table
 │   │   ├── privacy-policy/page.tsx
 │   │   └── accessibility-statement/page.tsx
 │   ├── components/site/
@@ -341,19 +346,26 @@ health-care-clinic/
 │   │   ├── footer.tsx               ← server: facts + legal links
 │   │   ├── legal-page.tsx           ← server: shared legal shell
 │   │   └── reveal.tsx               ← client: IntersectionObserver reveal
+│   ├── components/dashboard/
+│   │   ├── login-form.tsx           ← client: staff sign-in island
+│   │   └── logout-button.tsx        ← client: logout island
 │   └── lib/
 │       ├── content.ts               ← ALL copy, icon maps, nav links (as const)
+│       ├── auth.ts                  ← scrypt + HMAC session primitives (unit-tested)
 │       ├── db.ts                    ← Prisma singleton with env-resolved URL
 │       └── db-path.ts               ← pure URL resolution (unit-tested)
-├── prisma/schema.prisma             ← Appointment model
+├── prisma/schema.prisma             ← Appointment + AdminUser models
+├── scripts/seed.ts                  ← db:seed staff upsert (scrypt hash)
 ├── tests/
 │   ├── db-path.test.ts              ← 15 unit cases (Vitest)
-│   └── e2e/                         ← 22 specs (Playwright)
-│       ├── global-setup.ts          ← pushes schema to db/e2e.db
+│   ├── auth.test.ts                 ← 14 unit cases (Vitest)
+│   └── e2e/                         ← 28 tests (Playwright)
+│       ├── global-setup.ts          ← pushes schema to db/e2e.db + seeds admin
 │       ├── mobile-navigation.spec.ts ← chrome contract + trap guards
-│       ├── landing.spec.ts
+│       ├── landing.spec.ts          ← + title-deviation pin
 │       ├── appointment-form.spec.ts
-│       └── legal-pages.spec.ts
+│       ├── legal-pages.spec.ts      ← + title-deviation pins
+│       └── auth.spec.ts             ← login/logout/dashboard guard loop
 ├── public/media/                    ← hero video + poster, 5 section photos
 ├── docs/
 │   ├── Tailwind-V4-Validation-Report.md ← engine trap log (authoritative)
@@ -596,11 +608,12 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 
 | Category | Files | Tests | Location | Framework |
 | -------- | ----- | ----- | -------- | --------- |
-| Unit (pure seams) | 1 | 15 | `tests/db-path.test.ts` | Vitest |
-| E2E chrome contract | 1 | 8 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
-| E2E landing parity | 1 | 8 | `tests/e2e/landing.spec.ts` | Playwright |
+| Unit (pure seams) | 2 | 29 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (14) | Vitest |
+| E2E chrome contract | 1 | 7 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
+| E2E landing parity | 1 | 9 | `tests/e2e/landing.spec.ts` (incl. title pin) | Playwright |
 | E2E write path | 1 | 4 | `tests/e2e/appointment-form.spec.ts` | Playwright |
-| E2E legal pages | 1 | 3 | `tests/e2e/legal-pages.spec.ts` | Playwright |
+| E2E legal pages | 1 | 3 | `tests/e2e/legal-pages.spec.ts` (incl. title pins) | Playwright |
+| E2E auth loop | 1 | 5 | `tests/e2e/auth.spec.ts` | Playwright |
 
 ### 7.2 Test Patterns
 
@@ -614,16 +627,16 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 ### 7.3 Coverage Thresholds
 
 No numeric threshold configured (content-rendering app; the meaningful
-coverage is the parity surface). The gate is pass/fail: 15/15 unit,
-22/22 e2e.
+coverage is the parity surface). The gate is pass/fail: 29/29 unit,
+28/28 e2e.
 
 ### 7.4 Pre-Push Checklist
 
 - [ ] `bun run lint` — 0 errors
 - [ ] `bun run typecheck` — clean
-- [ ] `bun run test` — 15/15
+- [ ] `bun run test` — 29/29
 - [ ] `bun run build` — standalone output produced
-- [ ] `bun run test:e2e` — 22/22 (requires the build)
+- [ ] `bun run test:e2e` — 28/28 (requires the build)
 - [ ] `git status` clean of secrets/artifacts before commit
 
 ---

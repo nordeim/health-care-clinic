@@ -9,6 +9,14 @@ test.describe("landing page", () => {
     await page.goto("/");
   });
 
+  // Recorded deviation (docs/Tailwind-V4-Validation-Report.md, session 4):
+  // the reference's <title> is the Base44 platform placeholder "Base44 APP";
+  // this repo deliberately uses semantic titles. This pin prevents a silent
+  // regression of that decision in either direction.
+  test("document title is the clinic name (recorded deviation from the reference placeholder)", async ({ page }) => {
+    await expect(page).toHaveTitle("Green Grove Family Clinic");
+  });
+
   test("renders the hero with the four-line headline and video", async ({ page }) => {
     const h1 = page.getByRole("heading", { level: 1 });
     await expect(h1).toContainText("Health can");

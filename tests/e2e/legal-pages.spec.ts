@@ -5,6 +5,9 @@ import { expect, test } from "@playwright/test";
 test.describe("legal pages", () => {
   test("privacy policy renders its sections and back link", async ({ page }) => {
     await page.goto("/privacy-policy");
+    // Recorded deviation (validation report, session 4): semantic title, not
+    // the reference's "Base44 APP" platform placeholder.
+    await expect(page).toHaveTitle("Privacy Policy — Green Grove Family Clinic");
     await expect(page.getByRole("heading", { level: 1, name: "Privacy Policy" })).toBeVisible();
     await expect(page.getByText("Last updated: July 30, 2026")).toBeVisible();
 
@@ -25,6 +28,9 @@ test.describe("legal pages", () => {
 
   test("accessibility statement renders its sections and back link", async ({ page }) => {
     await page.goto("/accessibility-statement");
+    // Recorded deviation (validation report, session 4): semantic title, not
+    // the reference's "Base44 APP" platform placeholder.
+    await expect(page).toHaveTitle("Accessibility Statement — Green Grove Family Clinic");
     await expect(
       page.getByRole("heading", { level: 1, name: "Accessibility Statement" }),
     ).toBeVisible();

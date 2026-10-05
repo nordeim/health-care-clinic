@@ -311,3 +311,24 @@ assertions must read the right property per stack. (c) Next 16's dev-origin
 protection silently blocks dev chunks for the `127.0.0.1` origin (unhydrated page,
 native form GET fallbacks) — `allowedDevOrigins: ["127.0.0.1"]` in next.config.ts
 restores both origins.
+
+---
+
+## Recorded Deviations Beyond CSS Parity — Document Title (Session 4)
+
+The reference site's `<title>` is **`Base44 APP`** on every route (landing,
+`/privacy-policy`, `/accessibility-statement`) — a Base44 platform
+placeholder, not a design decision. This repo deliberately deviates:
+semantic per-route titles (`Green Grove Family Clinic`,
+`Privacy Policy — Green Grove Family Clinic`,
+`Accessibility Statement — Green Grove Family Clinic`,
+`Staff sign in — …`, `Appointments — …`).
+
+Rationale: parity doctrine preserves the reference's *design intent*; a
+platform artifact is not design intent. SEO and accessibility (screen
+readers announce the title first) require real titles. This is the same
+class of recorded deviation as vendoring media to `public/media/`.
+
+Pinned by `toHaveTitle` assertions in `tests/e2e/landing.spec.ts` and
+`tests/e2e/legal-pages.spec.ts` — a future refactor cannot silently regress
+the decision in either direction.
