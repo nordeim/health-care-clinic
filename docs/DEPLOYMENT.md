@@ -1,8 +1,8 @@
 # Deployment Guide
 
-ORBITAL ships as a single Next.js **standalone** build with a SQLite file
-database — one process, zero external services. This guide covers the
-supported production paths and the environment contract.
+The clinic site ships as a single Next.js **standalone** build with a
+SQLite file database — one process, zero external services. This guide
+covers the supported production path and the environment contract.
 
 ## 1. Build
 
@@ -11,10 +11,11 @@ bun install
 bun run build          # next build + standalone assembly (.next/standalone)
 ```
 
-The build compiles the page shell and the 16 API route handlers, then copies
+The build prerenders the landing and legal pages, compiles the two API
+route handlers (`/api/appointments`, `/api/health`), and copies
 `.next/static` and `public/` into `.next/standalone/` (see the `build`
-script in `package.json`). `next.config.ts` pins `outputFileTracingRoot` to
-the repo root — keep it; the standalone trace depends on it.
+script in `package.json`). `next.config.ts` pins `outputFileTracingRoot`
+to the repo root — keep it; the standalone trace depends on it.
 
 ## 2. Run
 
@@ -22,81 +23,47 @@ the repo root — keep it; the standalone trace depends on it.
 bun run start          # NODE_ENV=production bun .next/standalone/server.js
 ```
 
-The server listens on port 3000 by default (`PORT` overrides). Always start
-it from the repo root via the npm/bun script — the scripts guarantee the
-working directory that the SQLite path resolution and the standalone trace
-rely on. Behind a reverse proxy, forward `X-Forwarded-Proto` so cookie
-attributes derive the right scheme.
+The server listens on port 3000 by default (`PORT` overrides). Always
+start it from the repo root via the npm/bun script — the scripts
+guarantee the working directory that the SQLite path resolution and the
+standalone trace rely on.
 
-## 3. Environment variables
+## 3. Database contract
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `DATABASE_URL` | Yes | SQLite connection string. See §4. |
-| `AUTH_SECRET` | **Yes in production** | HMAC secret for session cookies. Generate with `openssl rand -hex 32`. An insecure dev constant is used when unset — never ship that. |
-| `NEXT_PUBLIC_SITE_URL` | Recommended | Canonical public origin, used for metadata URLs and `sitemap.xml` (e.g. `https://orbital.example.com`). |
+- **Production: use an ABSOLUTE `DATABASE_URL`.** Relative `file:` URLs
+  resolve against the repo that owns `prisma/schema.prisma`
+  (`src/lib/db-path.ts` implements the rule; `tests/db-path.test.ts`
+  pins it). That is the right behavior for a checkout, but a deployed
+  standalone copy should not depend on directory layout:
 
-## 4. Database location (§4 — the `.env.example` reference)
+  ```bash
+  DATABASE_URL="file:/srv/clinic/custom.db" bun .next/standalone/server.js
+  ```
 
-`DATABASE_URL` accepts three forms:
+- Initialize the schema before the first start:
+  `DATABASE_URL=<prod url> bun run db:push`.
+- The `appointments` table is the only state; back it up by copying the
+  file (SQLite single-writer: stop the server during the copy, or use
+  `sqlite3 ... ".backup ..."`).
 
-1. **Relative `file:` URL (the default, zero-config local story).**
-   ```
-   DATABASE_URL="file:../db/custom.db"
-   ```
-   Relative URLs resolve against the **`prisma/` directory that owns
-   `schema.prisma`** — exactly like the Prisma CLI — so this string points
-   at `<repo>/db/custom.db` for `prisma db push`, `prisma/seed.ts`,
-   `next build` and the running server alike, regardless of the process
-   working directory. The resolution rule lives in
-   `src/lib/db-path.ts` and is pinned by `tests/db-path.test.ts`.
+## 4. Health check
 
-2. **Absolute `file:` URL (recommended for production).**
-   ```
-   DATABASE_URL="file:/var/lib/orbital/custom.db"
-   ```
-   Absolute paths pass through untouched — immune to any working-directory
-   ambiguity across service managers, containers, or cron wrappers. Point
-   them at a persisted volume and back the file up.
+`GET /api/health` returns `200 {ok:true, database:"up"}` or `503` when
+the database is unreachable — wire your uptime monitor to it.
 
-3. **PostgreSQL.** Switch `provider = "postgresql"` in
-   `prisma/schema.prisma`, set a `postgresql://` URL, then
-   `bun run db:push && bun run db:seed`.
+## 5. Reverse proxy notes
 
-Initialize (or reset) the database with:
+- Forward `X-Forwarded-For` — the appointment rate limiter keys on it.
+- Serve `/media/hero-video.mp4` (11 MB) with caching headers or from a
+  CDN in front of the app.
+- No cookies, no sessions, no websockets — nothing else to configure.
+
+## 6. Verification before cutover
 
 ```bash
-bun run db:push        # apply schema (db push — no migrations folder)
-bun run db:seed        # idempotent demo workspace (wipes domain tables)
+curl -s https://<host>/api/health
+curl -s -X POST https://<host>/api/appointments \
+  -H 'Content-Type: application/json' \
+  -d '{"fullName":"Smoke Test","phone":"555-000-0000","specialty":"Primary Care"}'
+# expect 201 {"ok":true,"id":"..."}  (then delete the row if desired)
 ```
-
-`db/*.db` is gitignored; every fresh clone recreates it from the two
-commands above.
-
-## 5. Updating
-
-```bash
-git pull
-bun install
-bunx prisma generate   # after schema changes
-bun run db:push
-bun run build
-# restart the server process
-```
-
-## 6. Verification checklist
-
-```bash
-curl -s https://your-host/api/health          # {"status":"ok",...}
-bun run lint && bun run typecheck && bun run test
-./scripts/smoke-test.sh                       # 30 E2E checks (local)
-bun run test:e2e                              # Playwright suite (local)
-```
-
-## 7. Common production issues
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `Error code 14: Unable to open the database file` | Server started from a directory that has no `prisma/schema.prisma` and no absolute `DATABASE_URL` | Start via `bun run start`, or set an absolute `file:` URL (§4) |
-| Logins loop back to `/login` | `AUTH_SECRET` changed between restarts | Keep the secret stable across restarts |
-| Rate-limited logins (429) | 10 attempts/IP/15 min fixed window | Wait for `Retry-After`, or restart to clear the in-memory buckets (single-node) |

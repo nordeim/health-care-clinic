@@ -1,0 +1,278 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * Green Grove Family Clinic — Tailwind CSS v4 theme (CSS-first).
+ *
+ * Ported from the reference app's compiled Tailwind v3 stylesheet. The v3
+ * source defines shadcn-style BARE HSL triplets (`--primary: 151 32% 22%`)
+ * consumed as `hsl(var(--primary))`. Under Tailwind v4's `@theme inline` a
+ * bare triplet silently resolves to *transparent* (Validation Report,
+ * Project Trap Log #1), so every token below is a FULL `hsl()` color value
+ * and the `@theme inline` block references the indirection vars declared in
+ * `:root` / `.dark`.
+ * ------------------------------------------------------------------------- */
+
+@theme inline {
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* Palette — full hsl() values, NEVER bare triplets (v4 Trap #1). */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-hero-foreground: var(--hero-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-provider-panel: var(--provider-panel);
+  --color-service-top: var(--service-gradient-top);
+  --color-service-middle: var(--service-gradient-middle);
+  --color-service-bottom: var(--service-gradient-bottom);
+
+  /* v4 Trap #5 — the shadow-scale shift: v4 inserted `shadow-xs` at v3's
+   * `shadow-sm` geometry, so a byte-identical `shadow-sm` renders one notch
+   * heavier. Pin the v3 value so every `shadow-sm` in the port stays
+   * byte-identical to the reference. */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+  /* ECG heartbeat track — ping-pong sweep, ported from the reference's
+   * JS-driven oscillation of translateX(0 → -32px). */
+  --animate-heartbeat: heartbeat 2.8s ease-in-out infinite alternate;
+
+  @keyframes heartbeat {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-32px);
+    }
+  }
+}
+
+:root {
+  --background: hsl(205 50% 96%);
+  --foreground: hsl(151 32% 22%);
+  --card: hsl(54 38% 98%);
+  --card-foreground: hsl(151 32% 22%);
+  --popover: hsl(54 38% 98%);
+  --popover-foreground: hsl(151 32% 22%);
+  --primary: hsl(151 32% 22%);
+  --primary-foreground: hsl(50 58% 88%);
+  --hero-foreground: hsl(0 0% 100%);
+  --secondary: hsl(49 62% 82%);
+  --secondary-foreground: hsl(151 32% 22%);
+  --muted: hsl(203 28% 90%);
+  --muted-foreground: hsl(153 18% 35%);
+  --accent: hsl(205 42% 91%);
+  --accent-foreground: hsl(151 32% 22%);
+  --destructive: hsl(0 72% 52%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(151 18% 78%);
+  --input: hsl(151 18% 78%);
+  --ring: hsl(151 32% 22%);
+  --provider-panel: hsl(0 0% 100%);
+  --service-gradient-top: hsl(48 33% 96%);
+  --service-gradient-middle: hsl(3 27% 89%);
+  --service-gradient-bottom: hsl(41 88% 70%);
+  --radius: 1.25rem;
+}
+
+/* Dark token set carried over from the reference stylesheet. The reference
+ * ships these values but exposes no toggle in its UI; they are inert until
+ * a `.dark` class is applied to <html>. */
+.dark {
+  --background: hsl(151 30% 12%);
+  --foreground: hsl(50 58% 88%);
+  --card: hsl(151 27% 16%);
+  --card-foreground: hsl(50 58% 88%);
+  --provider-panel: hsl(0 0% 100%);
+  --popover: hsl(151 27% 16%);
+  --popover-foreground: hsl(50 58% 88%);
+  --primary: hsl(50 58% 82%);
+  --primary-foreground: hsl(151 32% 22%);
+  --hero-foreground: hsl(0 0% 100%);
+  --secondary: hsl(151 27% 20%);
+  --secondary-foreground: hsl(50 58% 88%);
+  --muted: hsl(151 25% 18%);
+  --muted-foreground: hsl(150 16% 70%);
+  --accent: hsl(151 20% 26%);
+  --accent-foreground: hsl(50 58% 88%);
+  --destructive: hsl(0 62% 42%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(151 15% 30%);
+  --input: hsl(151 15% 30%);
+  --ring: hsl(50 58% 82%);
+  --service-gradient-top: hsl(151 25% 16%);
+  --service-gradient-middle: hsl(151 22% 20%);
+  --service-gradient-bottom: hsl(42 45% 32%);
+}
+
+/* ---------------------------------------------------------------------------
+ * Base element styles — ported VERBATIM from the reference stylesheet's
+ * custom base layer. These are deliberately UNLAYERED (not inside
+ * @layer base) to reproduce the reference's specificity-based cascade:
+ *
+ *   h2/h3 !important sizes  >  any non-important size utility
+ *   (so text-4xl/5xl/6xl/7xl on h2 and text-3xl on h3 are visual no-ops,
+ *    exactly like the reference — every h2 renders 48px base / 60px at
+ *    sm+, every h3 renders 20px/1.25)
+ *   BUT utilities that are themselves !important (the legal pages'
+ *    `text-2xl! leading-tight!`) still win, because a layered !important
+ *    beats an unlayered !important — again matching the reference.
+ * ------------------------------------------------------------------------- */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400 !important;
+}
+
+h2 {
+  font-size: 3rem !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.04em;
+}
+
+h3 {
+  font-size: 20px !important;
+  line-height: 1.25 !important;
+}
+
+@media (min-width: 640px) {
+  h2 {
+    font-size: 3.75rem !important;
+  }
+}
+
+/* Mobile body/p type scale (reference: `@media(max-width:639px)`).
+ * Declared inside @layer base so non-important font-size utilities on <p>
+ * (e.g. the About card's text-xl) still win — the reference's
+ * specificity-based cascade produces the same outcome. */
+@layer base {
+  @media (max-width: 639px) {
+    body,
+    p {
+      font-size: 14px;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Reference custom component classes (ported verbatim from the v3 CSS).
+ * The !important flags survive the port: these classes ride along on
+ * elements that may also carry responsive type utilities.
+ * ------------------------------------------------------------------------- */
+
+.about-subtitle {
+  font-size: 14px !important;
+  font-weight: 400 !important;
+}
+
+@media (min-width: 640px) {
+  .about-subtitle {
+    font-size: 20px !important;
+    font-weight: 400;
+    text-wrap: balance;
+  }
+}
+
+.section-subtitle {
+  font-size: 14px !important;
+  font-weight: 400 !important;
+}
+
+@media (min-width: 640px) {
+  .section-subtitle {
+    font-size: 22px !important;
+    font-weight: 400 !important;
+  }
+}
+
+/* Hero readability scrim over the autoplaying video — verbatim from the
+ * reference compiled CSS (v3 hex-with-alpha stops, sRGB interpolation). */
+.hero-readability-gradient {
+  background: linear-gradient(90deg, #123f5c94, #b55b2742 34%, #b55b2700 66%);
+}
+
+/* Hero rotating badge — enter animation (exit is the interval swap itself).
+ * Ported from the reference's Framer AnimatePresence fade/translate. */
+@keyframes badge-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.badge-enter {
+  animation: badge-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-enter {
+    animation: none;
+  }
+}
+
+/* Native <details> FAQ accordion — the reference uses the `list-none`
+ * utility on <summary>; this belt-and-braces rule keeps Firefox/Chrome
+ * disclosure markers hidden for keyboard users as well. */
+summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Reveal-on-scroll: the reference drives these with Framer Motion
+ * `whileInView` (initial translate from --card-x/--card-y, then settles to
+ * the natural position). We reproduce the same choreography with an
+ * IntersectionObserver + CSS transition. The data attributes are toggled
+ * by src/components/site/reveal.tsx.
+ *
+ * The rules are scoped to `@media (scripting: enabled)` so the raw HTML
+ * (crawlers, no-JS visitors) always shows the settled state — and so the
+ * server-rendered `data-reveal="hidden"` markup hydrates identically on the
+ * client before the observer takes over. */
+@media (scripting: enabled) {
+  [data-reveal] {
+    opacity: 0;
+    transform: translateX(var(--card-x, 0px)) translateY(var(--card-y, 0px));
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+
+  [data-reveal="shown"] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Respect the user's motion preferences: no entrance choreography, content
+ * is simply present (the reference relies on Framer's reduced-motion
+ * defaults for the same outcome). */
+@media (scripting: enabled) and (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

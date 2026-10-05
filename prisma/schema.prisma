@@ -1,0 +1,26 @@
+// Green Grove Family Clinic — data model.
+// The landing page's single write path is the "Request an appointment" form:
+// POST /api/appointments -> validation -> Appointment row.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Appointment {
+  id            String   @id @default(cuid())
+  fullName      String
+  phone         String
+  email         String?
+  specialty     String
+  preferredDate String?
+  // Simple abuse signal: createdAt is exposed only to the API layer.
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("appointments")
+}

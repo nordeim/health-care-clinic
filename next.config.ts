@@ -11,21 +11,13 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  // Path-based SPA routing: the reference app's views live at real paths
-  // (/goals, /goals/<id>, /my-tasks, /activity, /team, /settings). We keep
-  // ONE page (src/app/page.tsx) and rewrite those paths onto it; the client
-  // store syncs view state with location.pathname (see src/lib/router.ts).
-  async rewrites() {
-    return [
-      { source: "/goals", destination: "/" },
-      { source: "/goals/:goalId", destination: "/" },
-      { source: "/my-tasks", destination: "/" },
-      { source: "/tasks", destination: "/" },
-      { source: "/activity", destination: "/" },
-      { source: "/team", destination: "/" },
-      { source: "/settings", destination: "/" },
-    ];
-  },
+  // Next 16 dev-origin protection silently blocks dev chunks when the page
+  // is reached through 127.0.0.1 instead of localhost (symptom: unhydrated
+  // document, native form GET fallbacks). Restores both origins.
+  // (Validation Report, Project Trap Log — session-12 methodology finding c.)
+  allowedDevOrigins: ["127.0.0.1"],
+  // Keep the dev overlay out of screenshots and screen recordings.
+  devIndicators: false,
 };
 
 export default nextConfig;

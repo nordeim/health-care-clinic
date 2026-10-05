@@ -1,34 +1,25 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// E2E layer (v2.3): boots the PRODUCTION standalone server on an isolated
-// port with its own scratch database (db/e2e.db, schema-pushed + seeded by
-// the global setup), then drives the real UI in Chromium.
+// E2E layer: boots the PRODUCTION standalone server on an isolated port
+// with its own scratch database (db/e2e.db, schema-pushed by the global
+// setup), then drives the real UI in Chromium.
 //
 // Prerequisites: `bun run build` (the standalone server must exist).
 // Run with: `bun run test:e2e`.
 //
-// Auth strategy: the "setup" project signs the demo user in ONCE and saves
-// the session cookie to tests/e2e/.auth/user.json; every spec in the main
-// project starts with that storageState. This is not just speed — the auth
-// endpoints are rate-limited (10 attempts/IP/15 min), so per-test logins
-// would trip the limiter mid-suite. tests/e2e/auth.spec.ts opts back out
-// with an empty storageState because it tests the logged-out surface.
-//
 // The unit layer stays in Vitest (see vitest.config.ts — it matches
-// *.test.ts only, so these *.spec.ts / *.setup.ts files are never picked
-// up twice).
+// *.test.ts only, so these *.spec.ts files are never picked up twice).
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const BASE_URL = `http://localhost:${PORT}`;
 const E2E_DATABASE_URL = "file:../db/e2e.db";
-const AUTH_STATE = "tests/e2e/.auth/user.json";
 
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
-  workers: 1, // one worker: the specs share a single seeded SQLite file
+  workers: 1, // one worker: the specs share a single SQLite file
   retries: 0,
   reporter: [["list"]],
   use: {
@@ -38,17 +29,8 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "setup",
-      testMatch: /auth\.setup\.ts/,
-    },
-    {
       name: "chromium",
-      dependencies: ["setup"],
-      testIgnore: /auth\.setup\.ts/,
-      use: {
-        ...devices["Desktop Chrome"],
-        storageState: AUTH_STATE,
-      },
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
   globalSetup: "./tests/e2e/global-setup.ts",
@@ -60,9 +42,9 @@ export default defineConfig({
     env: {
       ...process.env,
       PORT: String(PORT),
+      HOSTNAME: "localhost",
       NODE_ENV: "production",
       DATABASE_URL: E2E_DATABASE_URL,
-      AUTH_SECRET: "playwright-e2e-session-secret",
     } as Record<string, string>,
   },
 });

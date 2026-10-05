@@ -1,7 +1,7 @@
 {
-  "name": "orbital",
+  "name": "health-care-clinic",
   "version": "1.0.0",
-  "description": "ORBITAL — AI project management workspace (Next.js 16 + React 19 + Prisma/SQLite)",
+  "description": "Green Grove Family Clinic — production-grade Next.js 16 clone of the Base44 health-care-clinic landing experience (React 19 + Tailwind CSS v4 + Prisma/SQLite)",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
@@ -10,7 +10,6 @@
     "lint": "eslint .",
     "db:push": "prisma db push --accept-data-loss",
     "db:generate": "prisma generate",
-    "db:seed": "bun prisma/seed.ts",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "test": "vitest run",
@@ -54,6 +53,9 @@
     "vitest": "^5.0.1"
   },
   "trustedDependencies": [
+    "@prisma/client",
+    "@prisma/engines",
+    "prisma",
     "unrs-resolver"
   ]
 }
