@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14, 16, 18, 20 and 22.
-version: 2.8.2
+  12, 14, 16, 18, 20, 22 and 24.
+version: 2.8.3
 last_updated: 2026-10-06
-project_state: 99 unit tests + 43 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password)
+project_state: 99 unit tests + 44 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -58,6 +58,14 @@ footer), `/privacy-policy`,
 platform placeholder `"Base44 APP"`; this repo deliberately uses semantic
 per-route titles (SEO/a11y win over a platform artifact — recorded in the
 validation report, pinned by `toHaveTitle` e2e assertions).
+
+**Favicon chrome parity (session-24 F2):** the reference serves an inline
+SVG favicon (heart-rate glyph, clinic green) via `<link rel="icon"
+type="image/svg+xml">`; the glyph is vendored verbatim as
+`src/app/icon.svg` (App Router file convention — the link tag is
+auto-generated) and e2e-pinned. The reference's `/favicon.ico` 302 →
+logo.png fallback is a platform artifact serving a different image and is
+deliberately not replicated (see the Validation Report deviation entry).
 
 ---
 
@@ -173,6 +181,7 @@ asymmetry reproduces the reference's specificity cascade.
 
 ```
 src/app/                     routes + globals.css (the design system)
+src/app/icon.svg             the reference's SVG favicon, vendored (S24 F2)
 src/app/api/appointments/    POST — validation + rate limit + Prisma insert
 src/app/api/appointments/[id]/ PATCH — staff status transitions (session-guarded)
 src/app/api/auth/login|logout/  POST — scrypt verify + cookie set/clear
@@ -341,7 +350,7 @@ bun run test          # 99/99 (db-path 19 + auth 19 + deps 4 +
                       #  validation 27 + rate-limit 20 + status 10)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
-bun run test:e2e      # 43/43 (6 spec files)
+bun run test:e2e      # 44/44 (6 spec files)
 ```
 
 Manual smoke: mobile menu open → link click (closes + jumps) → Escape
@@ -837,3 +846,32 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   dropdown [38,74,57,230] exact); the full product loop with status
   transitions green under the still-active ambient DATABASE_URL hijack;
   20 screenshots refreshed (03-desktop-full exactly 1440×7490).
+
+### Session 24 — Favicon chrome parity, PAD count residuals, script-footgun note (v2.8.3)
+
+Fresh-eyes audit (13th; 5 findings: 2 Low, 3 Info, zero
+Critical/High/Medium, zero regressions) found the one reference-visible
+surface twelve prior audits never checked: the app shipped NO favicon
+while the reference serves an inline SVG one (heart-rate glyph, clinic
+green #264a38 + cream #f3ead0). Remediated TDD-first (Red: the new
+landing.spec icon pin fails on the 404 tree; Green: the reference glyph
+vendored verbatim as src/app/icon.svg — the App Router file convention
+auto-generates the link tag; /icon.svg serves 200 image/svg+xml; page
+height 7490px UNCHANGED, head-only chrome). The reference's /favicon.ico
+302→logo.png fallback deliberately not replicated (platform artifact
+serving a different image — the same recorded-deviation reasoning as the
+session-4 title). Plus: the two residual "15 unit" db-path claims in PAD
+ADR-004 + §3.2 corrected to 19 (the missed-sibling-row class), PAD §11's
+seed.ts row re-measured (~47), AGENTS.md gained the db:migrate/db:reset
+placeholder note (migrations-less repo — db:push + db:seed is the
+workflow), and the 6 realistic seed rows restored through the public API
+with statuses via the real PATCH API after the reset. Unit 99 (unchanged);
+e2e 43 → 44 (the icon pin) with the DOUBLE-consecutive-run proof re-held
+(44/44 × 2); live parity re-verified byte-exact on both sites at verified
+viewports (desktop 7490px both; mobile panel 192×148 @ (178,80) grid r24
+p8; link-click 0.421875 + scrollY 1837 BOTH; mobile height 12162 vs 12164
+— the documented 2px contact-section drift); pixel-rasterized dropdown
+[38,74,57,230] exact; the full product loop with status transitions green
+under the still-active ambient DATABASE_URL hijack; 20 screenshots
+refreshed (03-desktop-full exactly 1440×7490; dashboards show the restored
+6 seed rows).

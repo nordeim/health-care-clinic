@@ -36,7 +36,7 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 4. **IMPLEMENT** — One component per section; copy centralized; server
    components unless interaction demands a client island.
 5. **VERIFY** — Gate: `bun run lint && bun run typecheck && bun run test &&
-   bun run build`, then Playwright e2e (43 tests) plus in-browser
+   bun run build`, then Playwright e2e (44 tests) plus in-browser
    interaction checks at desktop and mobile widths.
 6. **DOCUMENT** — Engine-variance findings go into
    `docs/Tailwind-V4-Validation-Report.md` (trap log) and ADRs in
@@ -149,8 +149,8 @@ non-obvious-rules list; this file holds the reasoning.
 - **E2E (Playwright):** six spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
-  reduced-motion instant-jump pin, baseline security-header pin),
-  `appointment-form` (happy path + 422 validation + 422 UI field errors +
+  reduced-motion instant-jump pin, baseline security-header pin, the
+  SVG-favicon chrome pin), `appointment-form` (happy path + 422 validation + 422 UI field errors +
   429 + 413 + impossible dates + non-object body tolerance + curated
   transport-failure message + health), `legal-pages`, `auth` (login
   page, wrong credentials, session cookie contract incl. sameSite/Secure,
@@ -248,7 +248,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  99/99 unit, build OK, 43/43 e2e).
+  99/99 unit, build OK, 44/44 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

@@ -48,7 +48,7 @@ geometry).
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
 | 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests with status transitions (New → Confirmed → Completed via `PATCH /api/appointments/[id]`), server-guarded |
 | 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), strict server-side payload validation, and baseline security headers on every route response and app-level redirect (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, no `X-Powered-By`; the framework's internal 308 trailing-slash redirect is emitted before `headers()` applies — a documented, e2e-pinned limitation) |
-| ✅ Tested | 99 unit tests + 43 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), and the validation + timing-equalization + status seams |
+| ✅ Tested | 99 unit tests + 44 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), and the validation + timing-equalization + status seams |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified
@@ -94,6 +94,7 @@ flowchart TB
 ├── 📂 app/
 │   ├── 📄 globals.css            ← Tailwind v4 theme: full hsl() tokens, pinned shadows, base element rules
 │   ├── 📄 layout.tsx             ← DM Sans via next/font, metadata, viewport
+│   ├── 📄 icon.svg               ← the reference's SVG favicon (vendored)
 │   ├── 📄 page.tsx               ← Landing composition (8 scroll sections + fixed header + footer)
 │   ├── 📂 api/appointments/      ← POST — validated writes; [id]/ PATCH — staff status transitions
 │   ├── 📂 api/auth/              ← POST login/logout — scrypt verify + session cookie

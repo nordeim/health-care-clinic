@@ -17,10 +17,16 @@ the log tails, never by the wrapper's exit status.
 | Lint | `bun run lint` (14 correctness rules ON; every off documented in the config — session-12 F3, session-16 F3) |
 | Typecheck | `bun run typecheck` |
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
-| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 43 tests) |
+| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 44 tests) |
 | DB schema | `bun run db:push` (Prisma; SQLite at `db/custom.db`) |
 | Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) |
 | Production | `bun run build && bun .next/standalone/server.js` |
+
+NOTE (session-24 F3): `db:migrate` / `db:reset` (further down the scripts
+list) are PLACEHOLDER scripts for a future `prisma migrate` adoption (§4.2
+of the PAD) — this repo is schema-first (`db:push` + `db:seed`); `prisma/`
+has no migrations history, so `db:reset` errors and `db:migrate` would
+create a divergent one.
 
 **Verification gate (run before any push):**
 `bun run lint && bun run typecheck && bun run test && bun run build`

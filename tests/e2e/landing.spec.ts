@@ -17,6 +17,19 @@ test.describe("landing page", () => {
     await expect(page).toHaveTitle("Green Grove Family Clinic");
   });
 
+  test("head carries the SVG icon link (session-24 F2 favicon chrome parity)", async ({ page }) => {
+    // Session-24 F2: the reference serves an inline SVG favicon (a
+    // heart-rate glyph in the clinic green) via <link rel="icon"
+    // type="image/svg+xml">; this repo 404'd on every icon request until
+    // the glyph was vendored as src/app/icon.svg (the App Router file
+    // convention auto-generates the link tag). This pin guards the chrome
+    // contract against silent removal — the same recorded-deviation class
+    // as the title pin above.
+    const icon = page.locator('link[rel="icon"][type="image/svg+xml"]');
+    await expect(icon).toHaveCount(1);
+    expect(await icon.getAttribute("href")).toBeTruthy();
+  });
+
   test("baseline security headers are present on responses (session-14 F3)", async ({ request }) => {
     // Session-14 F3: the audit found zero standard hardening headers and an
     // exposed X-Powered-By. The baseline set (nosniff / frame denial /

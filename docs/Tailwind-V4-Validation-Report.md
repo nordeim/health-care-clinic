@@ -332,3 +332,30 @@ class of recorded deviation as vendoring media to `public/media/`.
 Pinned by `toHaveTitle` assertions in `tests/e2e/landing.spec.ts` and
 `tests/e2e/legal-pages.spec.ts` — a future refactor cannot silently regress
 the decision in either direction.
+
+## Recorded Deviations Beyond CSS Parity — Favicon / Site Icon (Session 24)
+
+The reference serves its tab icon as an **inline SVG data URI** via
+`<link rel="icon" type="image/svg+xml">` — a heart-rate glyph (heart +
+pulse line) in the clinic green `#264a38` with cream `#f3ead0` stroke,
+viewBox 32×32 (the Base44 platform icon). The reference additionally
+answers `/favicon.ico` with a 302 to a hosted `logo.png` — a platform
+fallback artifact serving a DIFFERENT image, not the tab icon browsers
+render (every modern browser prefers the link tag when present).
+
+Until session 24 this repo shipped NO icon at all (`/favicon.ico` → 404,
+no `metadata.icons`, no link tag) — the one reference-visible chrome
+surface never audited in twelve prior sessions (found by the session-24
+fresh-eyes audit, F2).
+
+Decision: the reference glyph is vendored **verbatim** as
+`src/app/icon.svg` — the App Router file convention, which auto-generates
+`<link rel="icon" href="/icon.svg?…" sizes="any" type="image/svg+xml">`.
+Tab-icon parity is exact (same glyph, same colors); the `/favicon.ico`
+redirect fallback is deliberately NOT replicated (platform artifact, not
+design intent — the same reasoning as the title deviation above).
+Head-only chrome: zero layout impact (page height stays 7490px at
+1440×900 — re-measured after the change).
+
+Pinned by the `SVG icon link` assertion in `tests/e2e/landing.spec.ts` —
+a future refactor cannot silently remove the chrome contract.
