@@ -3,6 +3,21 @@ import { expect, test } from "@playwright/test";
 // Appointment request funnel — the landing page's only write path.
 // Drives the real form against the real API + SQLite (db/e2e.db).
 
+// Per-run XFF keys (session-14 F2 — the session-10 F6 doctrine extended
+// from the limiter/413 specs to EVERY request-level spec): each key derives
+// its fourth octet from the run timestamp and its third octet is
+// spec-unique, so no two specs share a limiter bucket — neither within one
+// run (even when two constants are evaluated in the same millisecond at
+// file load) nor across runs against a reused reuseExistingServer instance
+// on :3100. Previously the impossible-dates spec sent 3 requests under the
+// FIXED key 203.0.113.2 — a second suite run within 10 minutes pushed that
+// bucket to 6 and the 422 assertions failed with a 429. The 198.51.10x
+// bases are disjoint from the 429/413 specs' inline per-run keys
+// (203.0.113.x / 198.51.100.x).
+const VALIDATION_KEY = `198.51.101.${(Date.now() % 200) + 10}`;
+const NONOBJECT_KEY = `198.51.102.${(Date.now() % 200) + 10}`;
+const DATES_KEY = `198.51.103.${(Date.now() % 200) + 10}`;
+
 test.describe("appointment form", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/#contact");
@@ -45,12 +60,13 @@ test.describe("appointment form", () => {
   });
 
   test("server-side validation rejects an impossible payload", async ({ request }) => {
-    // Dedicated spoofed XFF key: every API-level test gets an isolated
-    // limiter bucket so the shared "unknown" bucket (used by the
-    // browser-driven POSTs below) can never be exhausted by the suite
-    // itself (session-8 F20).
+    // Dedicated per-run spoofed XFF key (session-14 F2): every API-level
+    // test gets an isolated limiter bucket so the shared "unknown" bucket
+    // (used by the browser-driven POSTs below) can never be exhausted by
+    // the suite itself (session-8 F20) — and a reused server can never
+    // poison this spec's bucket either.
     const response = await request.post("/api/appointments", {
-      headers: { "X-Forwarded-For": "203.0.113.1" },
+      headers: { "X-Forwarded-For": VALIDATION_KEY },
       data: { fullName: "x", phone: "1", specialty: "Not A Service" },
     });
     expect(response.status()).toBe(422);
@@ -67,7 +83,7 @@ test.describe("appointment form", () => {
     // (session-10 F1 mirror): `null` is valid JSON; the seam turns it into
     // an empty record and the route answers the standard 422 field map.
     const response = await request.post("/api/appointments", {
-      headers: { "X-Forwarded-For": "203.0.113.4" },
+      headers: { "X-Forwarded-For": NONOBJECT_KEY },
       data: null as unknown as object,
     });
     expect(response.status()).toBe(422);
@@ -83,7 +99,7 @@ test.describe("appointment form", () => {
     // validation seam now round-trips the components (session-8 F4).
     for (const preferredDate of ["2025-02-31", "2025-04-31", "2025-02-30"]) {
       const response = await request.post("/api/appointments", {
-        headers: { "X-Forwarded-For": "203.0.113.2" },
+        headers: { "X-Forwarded-For": DATES_KEY },
         data: {
           fullName: "Calendar Probe",
           phone: "555-0199",
@@ -166,5 +182,28 @@ test.describe("appointment form", () => {
     const response = await request.get("/api/health");
     expect(response.ok()).toBeTruthy();
     expect(await response.json()).toMatchObject({ ok: true, database: "up" });
+  });
+
+  test("a network failure shows a curated message, not the raw engine string (session-14 F7)", async ({ page }) => {
+    // Session-14 F7: transport-level fetch rejections used to surface the
+    // raw browser message verbatim ("Failed to fetch" in Chromium —
+    // engine-specific elsewhere), outside the curated API-message contract
+    // the form otherwise keeps. Aborting the API route at the Playwright
+    // layer produces the exact same TypeError a real network failure
+    // would — no server sabotage required. The user's input must survive.
+    await page.route("**/api/appointments", (route) => route.abort());
+    await page.getByLabel("Full name").fill("Offline Probe");
+    await page.getByLabel("Phone number").fill("555-0160");
+    await page.getByLabel("Specialty").selectOption("Primary Care");
+    await page.getByRole("button", { name: "Request my visit" }).click();
+
+    // Scoped to the form: Next's route announcer also carries role=alert.
+    await expect(page.locator("form").getByRole("alert")).toContainText(
+      /check your connection and try again/i,
+    );
+    await expect(page.locator("form").getByRole("alert")).not.toContainText(
+      /failed to fetch/i,
+    );
+    await expect(page.getByLabel("Full name")).toHaveValue("Offline Probe");
   });
 });

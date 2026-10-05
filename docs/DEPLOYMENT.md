@@ -22,6 +22,22 @@ Note: `dev`/`build`/`db:*` scripts strip any ambient `DATABASE_URL`
 `start` script (below) reads ambient env, which is the production
 deliberate injection point.
 
+**⚠ `.env` travels with the artifact (session-14 F4):** `next build`
+embeds a byte-identical copy of the repo `.env` — including
+`ADMIN_EMAIL`, `ADMIN_PASSWORD` and `AUTH_SECRET` — at
+`.next/standalone/.env`. The standalone server loads it at runtime unless
+ambient env overrides the values. If you ship the `.next/standalone/`
+folder anywhere, either strip that file first (`rm .next/standalone/.env`)
+or treat the whole artifact as secret-bearing: rotate `AUTH_SECRET` and
+the staff password after copying, and never distribute the folder.
+
+Baseline security headers (`X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`)
+are applied by `next.config.ts` on every route since session 14, and
+`X-Powered-By` is suppressed. A full CSP belongs at the reverse-proxy
+seam (see §6) — the reveal self-heal inline `<script>` would need a hash
+or nonce to survive a script-src restriction.
+
 ## 2. Run
 
 ```bash

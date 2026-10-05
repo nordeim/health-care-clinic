@@ -29,6 +29,14 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "react-hooks/purity": "error",
 
     // ---- Next.js: ON ----------------------------------------------------
+    // KNOWN BLIND SPOT (session-14 F1): the plugin's normalizeURL appends a
+    // trailing slash to the href (/privacy-policy -> /privacy-policy/) while
+    // app-route regexes are built via normalizeAppPath WITHOUT one
+    // (^/privacy-policy$) — so only ROOT-href anchors can ever match. The
+    // footer's two legal links were plain <a> right through five audits
+    // because the rule cannot see them; they were converted to next/link by
+    // the session-14 audit, not by this rule. Audits must grep for
+    // href="/…" anchors to App-Router pages manually.
     "@next/next/no-html-link-for-pages": "error",
 
     // ---- General correctness: ON (verified 0 findings) ------------------

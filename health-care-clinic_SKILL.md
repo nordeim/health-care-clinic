@@ -7,11 +7,11 @@ description: >
   dependency-free staff auth/dashboard extension. Captures the
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
-  methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10
-  and 12.
-version: 2.5.0
+  methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
+  12 and 14.
+version: 2.6.0
 last_updated: 2026-10-05
-project_state: 85 unit tests + 38 e2e tests green; HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on both POST routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254); env-leak guard active (env -u); lint gate honest (13 correctness rules ON, every off documented)
+project_state: 85 unit tests + 41 e2e tests green; HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on both POST routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every response (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed); env-leak guard active (env -u); lint gate honest (13 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -327,11 +327,11 @@ API calls surface there. API failures log structured messages
 ```bash
 bun run lint          # 0 errors
 bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
-bun run test          # 76/76 (db-path 15 + auth 19 + deps 4 +
-                      #  validation 20 + rate-limit 18)
+bun run test          # 85/85 (db-path 15 + auth 19 + deps 4 +
+                      #  validation 27 + rate-limit 20)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement static; /api/* /dashboard dynamic
-bun run test:e2e      # 37/37 (5 spec files)
+bun run test:e2e      # 41/41 (5 spec files)
 ```
 
 Manual smoke: mobile menu open → link click (closes + jumps) → Escape
@@ -648,7 +648,7 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   correctness/dep-safety rules ON (every one at 0 findings — the
   session-8/10 manual effect audits held) and every remaining off
   documented (no-undef: TS type-only globals false-positive; no-img-element:
-  parity `<img>` ports; style noise). The three real
+  parity `<img>` ports; style noise). The three root-href
   `no-html-link-for-pages` hits fixed by converting to `next/link`
   (login `/#contact`, legal back-link, dashboard "View site"). New login
   limiter e2e pin: 10 × 401 then 429 under a per-run 198.51.100.x spoofed
@@ -656,3 +656,33 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   e2e 37 → 38. Live parity re-verified byte-exact (mobile link-click
   0.421875 on BOTH sites, same session, same method; 7490px); 20
   screenshots refreshed (03-desktop-full is exactly 1440×7490).
+- **Session 14** (footer completion + e2e cross-run keys + security
+  headers + login email bound + transport-message curation): the
+  fresh-eyes audit found the residuals five audits had missed — the two
+  FOOTER legal links still plain `<a>` (invisible to
+  `no-html-link-for-pages`, which is structurally blind to non-root
+  App-Router routes: the plugin normalizes hrefs with a trailing slash the
+  route regexes lack, so only root-href anchors can ever match — the
+  session-12 "three real hits" claim undercounted; the blind spot is now
+  recorded in the eslint config), the impossible-dates spec posting 3
+  requests under a FIXED XFF key (2nd run within 10 min → 429 flake), zero
+  security headers with `X-Powered-By` exposed, `next build` embedding a
+  byte-identical `.env` (staff password + AUTH_SECRET) into
+  `.next/standalone/.env` with no runbook warning, the login email without
+  the 254 bound the appointments route enforces, a stale dev-PII
+  query-log comment (Prisma 6.11 prints SQL templates with `?`
+  placeholders only — bound values are NOT printed), and raw
+  "Failed to fetch" engine strings surfacing in both forms. Remediated
+  TDD-first (3 Red e2e tests confirmed failing): footer → `next/link`, ALL
+  request-level e2e specs on per-run XFF keys (module constants with
+  spec-unique third octets — collision-proof within and across runs),
+  `next.config.ts` baseline headers (nosniff / X-Frame-Options DENY /
+  Referrer-Policy + `poweredByHeader: false`; e2e-pinned; CSP documented
+  as the proxy-seam's job), the login route importing `EMAIL_MAX_LENGTH`
+  (300-char email → 422, no new oracle — fires before DB/scrypt),
+  `TypeError` curation in both forms' catch blocks (e2e-pinned via
+  `page.route().abort()`), the DEPLOYMENT.md artifact warning, and the
+  db.ts comment correction. Unit suite 85 (no unit changes); e2e 38 → 41.
+  Live parity re-verified byte-exact (mobile link-click 0.421875 BOTH
+  sites; 7490px); 20 screenshots refreshed (03-desktop-full exactly
+  1440×7490).

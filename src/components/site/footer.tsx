@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Clock, Copyright, HeartPulse, MapPin, Phone } from "lucide-react";
 import { footerContact } from "@/lib/content";
 
@@ -46,12 +47,18 @@ export function Footer() {
             <span>{footerContact.phone}</span>
           </a>
           <nav aria-label="Legal" className="flex flex-col gap-2">
-            <a href="/privacy-policy" className="hover:underline">
+            {/* next/link (session-14 F1): client-side navigation to the
+             * App-Router pages, matching the session-12 conversions. These
+             * two were invisible to the no-html-link-for-pages lint rule —
+             * the plugin normalizes hrefs with a trailing slash while
+             * app-route regexes are built without one, so only root-href
+             * anchors can ever match (see eslint.config.mjs). */}
+            <Link href="/privacy-policy" className="hover:underline">
               Privacy Policy
-            </a>
-            <a href="/accessibility-statement" className="hover:underline">
+            </Link>
+            <Link href="/accessibility-statement" className="hover:underline">
               Accessibility Statement
-            </a>
+            </Link>
           </nav>
           <p className="flex items-center gap-3 leading-5">
             <Copyright className="h-5 w-5 shrink-0" aria-hidden="true" />

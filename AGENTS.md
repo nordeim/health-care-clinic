@@ -12,7 +12,7 @@ Every line answers: "would an agent likely miss this without help?"
 | Lint | `bun run lint` (13 correctness rules ON; every off documented in the config — session-12 F3) |
 | Typecheck | `bun run typecheck` |
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
-| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB) |
+| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 41 tests) |
 | DB schema | `bun run db:push` (Prisma; SQLite at `db/custom.db`) |
 | Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) |
 | Production | `bun run build && bun .next/standalone/server.js` |
@@ -136,6 +136,11 @@ stays byte-faithful. All marketing copy lives in
 - Section ids are a public contract: `#top #about #services #insurance
   #providers #contact #faq` — the nav, scroll-spy, CTAs and e2e specs all
   depend on them.
+- Internal navigation to App-Router pages uses `next/link` (footer legal
+  links included). NOTE: the `no-html-link-for-pages` lint rule CANNOT see
+  non-root page anchors (href trailing-slash normalization vs route-regex
+  asymmetry — recorded in `eslint.config.mjs`); audits must grep for
+  `href="/…"` anchors manually.
 - Lucide icons only; size classes match the reference (`h-4 w-4` circles,
   `h-5 w-5` footer/trigger, `h-6 w-6` FAQ/footer logo).
 - Commit style: Conventional Commits, atomic commits, never commit
@@ -147,6 +152,9 @@ stays byte-faithful. All marketing copy lives in
   e2e staff account (E2E_ADMIN_EMAIL/PASSWORD exported from global-setup.ts);
   specs run single-worker (shared SQLite file). `test:e2e` requires a prior
   `bun run build` (standalone server).
+- EVERY request-level e2e spec derives its spoofed XFF key per run
+  (module constants, spec-unique third octets) — a `reuseExistingServer`
+  instance can never poison another run's limiter bucket.
 - The appointment happy-path test deliberately does NOT assert the
   in-flight "Sending…" state — it races a fast local API.
 - Headless hover checks are unreliable: v4 wraps `hover:` variants in

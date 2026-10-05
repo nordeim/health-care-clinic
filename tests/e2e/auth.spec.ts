@@ -5,6 +5,18 @@ import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from "./global-setup";
 // The full loop: a public appointment submission becomes visible on the
 // authenticated dashboard (form -> API -> SQLite -> dashboard).
 
+// Per-run XFF keys (session-14 F2 — the session-10 F6 doctrine extended
+// from the limiter specs to EVERY request-level spec): each key derives its
+// fourth octet from the run timestamp and its third octet is spec-unique,
+// so no two specs share a limiter bucket — neither within one run (even
+// when two constants are evaluated in the same millisecond at file load)
+// nor across runs against a reused reuseExistingServer instance on :3100.
+// The 192.0.2.x base (TEST-NET-1) is disjoint from every other key in this
+// file, including the login-limiter pin's 198.51.100.x.
+const NONOBJECT_KEY = `192.0.2.${(Date.now() % 200) + 10}`;
+const ENUM_KEY = `192.0.3.${(Date.now() % 200) + 10}`;
+const EMAIL_BOUND_KEY = `192.0.4.${(Date.now() % 200) + 10}`;
+
 test.describe("staff authentication", () => {
   test("login page renders the staff sign-in surface", async ({ page }) => {
     await page.goto("/login");
@@ -116,7 +128,7 @@ test.describe("staff authentication", () => {
     // returned an unhandled 500 (verified live). The route must answer the
     // same 422 field map the appointments route gives for non-object
     // bodies. Scalar JSON values (42) are included as the sibling shapes.
-    const headers = { "X-Forwarded-For": "203.0.113.51" };
+    const headers = { "X-Forwarded-For": NONOBJECT_KEY };
     for (const data of [null, 42] as unknown[]) {
       const response = await request.post("/api/auth/login", {
         headers,
@@ -136,8 +148,9 @@ test.describe("staff authentication", () => {
     // TIMING half of the contract — scrypt runs on both paths via
     // DUMMY_HASH — is pinned at the unit layer (tests/auth.test.ts); here
     // we pin that nothing about the RESPONSE lets an attacker tell the
-    // difference. Dedicated spoofed XFF key keeps the limiter isolated.
-    const headers = { "X-Forwarded-For": "203.0.113.50" };
+    // difference. Per-run spoofed XFF key (session-14 F2) keeps the limiter
+    // isolated across runs.
+    const headers = { "X-Forwarded-For": ENUM_KEY };
     const unknown = await request.post("/api/auth/login", {
       headers,
       data: { email: "nobody@greengrove.test", password: "whatever-password" },
@@ -190,5 +203,25 @@ test.describe("staff authentication", () => {
     expect(throttled.status()).toBe(429);
     const body = await throttled.json();
     expect(body.error).toBe("Too many attempts. Please try again in a few minutes.");
+  });
+
+  test("login bounds the email at 254 chars like the appointments route (session-14 F5)", async ({ request }) => {
+    // Session-14 F5: the appointments route caps emails at
+    // EMAIL_MAX_LENGTH (254, RFC 5321) but the login route only
+    // pattern-checked — a 300-char pattern-valid email burned a full
+    // scrypt pass on its way to a generic 401 (live-verified). The seam's
+    // bound now applies to BOTH consumers of the email contract; the 422
+    // fires before any DB/scrypt work — the sender already knows the
+    // address they submitted is too long, so no enumeration oracle is
+    // created (the malformed-email 422 has always short-circuited the
+    // same way).
+    const longEmail = `${"b".repeat(288)}@example.com`; // exactly 300 chars, pattern-valid
+    const response = await request.post("/api/auth/login", {
+      headers: { "X-Forwarded-For": EMAIL_BOUND_KEY },
+      data: { email: longEmail, password: "some-valid-length-password" },
+    });
+    expect(response.status()).toBe(422);
+    const body = await response.json();
+    expect(body.fields?.email).toBe("Email must be 254 characters or fewer.");
   });
 });

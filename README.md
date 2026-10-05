@@ -47,8 +47,8 @@ geometry).
 | ⚖️ Legal pages | `/privacy-policy` and `/accessibility-statement` with identical copy and layout |
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
 | 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests, server-guarded |
-| 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), and strict server-side payload validation |
-| ✅ Tested | 85 unit tests + 38 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound, and the validation + timing-equalization seams |
+| 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), strict server-side payload validation, and baseline security headers on every response (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, no `X-Powered-By`) |
+| ✅ Tested | 85 unit tests + 41 Playwright e2e tests, including Tailwind v4 trap guards, title-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract, the curated transport-failure message, and the validation + timing-equalization seams |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified
@@ -149,7 +149,7 @@ starting with `$` must be escaped as `\$`).
 | -------- | ------ | --------------- | ----- |
 | `/api/appointments` | POST | `{fullName, phone, email?, specialty, preferredDate?}` → `201 {ok, id}` | 422 with field map on invalid input (non-object bodies get the same field map; email capped at 254 chars); 413 over 64 KiB (stream-read cap — holds for chunked bodies AND transport errors degrade to 400); 429 when rate-limited (5 req / 10 min / IP) |
 | `/api/health` | GET | `200 {ok, database}` | 503 when the DB is unreachable |
-| `/api/auth/login` | POST | `{email, password}` → `200 {ok}` + httpOnly session cookie | 401 generic error (no user enumeration); 422 field map; 429 rate-limited (10 / 10 min / IP) |
+| `/api/auth/login` | POST | `{email, password}` → `200 {ok}` + httpOnly session cookie | 401 generic error (no user enumeration); 422 field map (email pattern + the shared 254-char bound); 429 rate-limited (10 / 10 min / IP) |
 | `/api/auth/logout` | POST | → `200 {ok}` | Clears the session cookie; idempotent |
 
 ## Environment Variables

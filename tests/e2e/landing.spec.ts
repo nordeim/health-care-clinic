@@ -17,6 +17,22 @@ test.describe("landing page", () => {
     await expect(page).toHaveTitle("Green Grove Family Clinic");
   });
 
+  test("baseline security headers are present on responses (session-14 F3)", async ({ request }) => {
+    // Session-14 F3: the audit found zero standard hardening headers and an
+    // exposed X-Powered-By. The baseline set (nosniff / frame denial /
+    // referrer policy) is applied in next.config.ts for every route —
+    // response headers are invisible to rendering, so parity is untouched.
+    // A full CSP belongs to the reverse-proxy seam (DEPLOYMENT.md §6).
+    const response = await request.get("/");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers()["x-frame-options"]).toBe("DENY");
+    expect(response.headers()["referrer-policy"]).toBe(
+      "strict-origin-when-cross-origin",
+    );
+    expect(response.headers()["x-powered-by"]).toBeUndefined();
+  });
+
   test("renders the hero with the four-line headline and video", async ({ page }) => {
     const h1 = page.getByRole("heading", { level: 1 });
     await expect(h1).toContainText("Health can");

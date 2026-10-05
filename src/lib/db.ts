@@ -24,10 +24,15 @@ const globalForPrisma = globalThis as unknown as {
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
-    // Dev query logging prints BOUND PARAMETERS — patient names, phones,
-    // emails — to the dev console (session-10 audit note). Dev-only and
-    // single-operator by design; do not pipe dev.log into shared systems,
-    // or narrow this to ['error', 'warn'] if it ever is.
+    // Dev query logging — accuracy note (session-14 F6): Prisma 6.11's
+    // `['query']` events print the SQL TEMPLATE with `?` placeholders only;
+    // bound parameter VALUES (patient names, phones, emails) are NOT
+    // emitted. An earlier revision of this comment claimed values were
+    // printed — verified false against dev.log (21 query lines, zero
+    // bound values across live inserts/selects). Still dev-only, still
+    // single-operator: keep not piping dev.log into shared systems
+    // (defense in depth — raw/bypassing query layers would print values),
+    // or narrow to ['error', 'warn'] if that ever changes.
     log: process.env.NODE_ENV === 'production' ? ['error'] : ['query'],
   })
 

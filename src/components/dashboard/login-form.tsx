@@ -61,10 +61,17 @@ export function LoginForm() {
       router.refresh();
     } catch (error) {
       setStatus("error");
+      // Session-14 F7: a transport-level fetch failure rejects with a
+      // TypeError whose message is the raw engine string ("Failed to fetch"
+      // in Chromium — engine-specific elsewhere). Curate it like every
+      // other message the form shows; every other Error carries an
+      // already-curated message (API body or the thrown status line).
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong. Please try again.",
+        error instanceof TypeError
+          ? "We couldn't reach the sign-in server. Please check your connection and try again."
+          : error instanceof Error
+            ? error.message
+            : "Something went wrong. Please try again.",
       );
     }
   }

@@ -6,7 +6,7 @@ import {
   signSession,
   verifyLoginPassword,
 } from "@/lib/auth";
-import { EMAIL_PATTERN } from "@/lib/validation";
+import { EMAIL_MAX_LENGTH, EMAIL_PATTERN } from "@/lib/validation";
 import {
   MAX_BODY_BYTES,
   clientKey,
@@ -30,7 +30,11 @@ import {
  *    with a field map on missing/invalid shapes. Non-object bodies
  *    (null / scalars) degrade to the 422 field map — property access on
  *    a JSON `null` used to 500 outside the parse try/catch (session-10
- *    F1, verified live).
+ *    F1, verified live). The email field is bounded at
+ *    EMAIL_MAX_LENGTH (254) exactly like the appointments route — one
+ *    seam, one bound (session-14 F5; the 422 fires before any DB/scrypt
+ *    work, and the sender already knows the address is too long, so no
+ *    oracle is created).
  *  - 429 when the per-IP fixed-window limiter trips (10 attempts / 10 min,
  *    keyed on the LAST X-Forwarded-For token — see src/lib/rate-limit.ts).
  *  - The response never echoes the submitted values back.
@@ -73,6 +77,10 @@ export async function POST(request: Request) {
 
   if (!email || !EMAIL_PATTERN.test(email)) {
     errors.email = "Enter a valid email address.";
+  } else if (email.length > EMAIL_MAX_LENGTH) {
+    // Same bound and message as the appointments route (session-14 F5):
+    // the seam exports EMAIL_MAX_LENGTH and BOTH consumers honor it.
+    errors.email = "Email must be 254 characters or fewer.";
   }
   if (!password) {
     errors.password = "Enter your password.";

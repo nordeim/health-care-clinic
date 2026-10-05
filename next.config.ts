@@ -23,6 +23,29 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   // Keep the dev overlay out of screenshots and screen recordings.
   devIndicators: false,
+  // Session-14 F3: stop advertising the framework (X-Powered-By header).
+  poweredByHeader: false,
+  // Session-14 F3: baseline security headers on EVERY route. Response
+  // headers are invisible to rendering — parity is untouched (the e2e
+  // header pin lives in landing.spec.ts). Each is safe for this app:
+  //  - nosniff: no MIME confusion consumers exist, but it is free defense.
+  //  - X-Frame-Options DENY: nothing legitimately frames the clinic site.
+  //  - Referrer-Policy strict-origin-when-cross-origin: no feature reads
+  //    referrers; cross-origin navigations only leak the origin.
+  // A full CSP (the reveal self-heal inline <script> would need a hash or
+  // nonce) belongs to the reverse-proxy seam — see docs/DEPLOYMENT.md §6.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
