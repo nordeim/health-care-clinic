@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { HeartPulse } from "lucide-react";
@@ -143,9 +144,9 @@ export function LoginForm() {
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
         Staff access only. For an appointment, use the{" "}
-        <a href="/#contact" className="underline underline-offset-2">
+        <Link href="/#contact" className="underline underline-offset-2">
           request form
-        </a>{" "}
+        </Link>{" "}
         or call 123-456-7890.
       </p>
     </div>

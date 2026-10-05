@@ -6,6 +6,7 @@ import {
   signSession,
   verifyLoginPassword,
 } from "@/lib/auth";
+import { EMAIL_PATTERN } from "@/lib/validation";
 import {
   MAX_BODY_BYTES,
   clientKey,
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+  if (!email || !EMAIL_PATTERN.test(email)) {
     errors.email = "Enter a valid email address.";
   }
   if (!password) {

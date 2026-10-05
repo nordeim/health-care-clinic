@@ -32,6 +32,9 @@ async function main() {
 main()
   .catch((error) => {
     console.error("[db:seed] failed:", error);
-    process.exit(1);
+    // exitCode (not process.exit) so the chained .finally below actually
+    // runs before the process ends — $disconnect was dead code on the
+    // failure path before session-12 F8 (process.exit terminated first).
+    process.exitCode = 1;
   })
   .finally(() => db.$disconnect());

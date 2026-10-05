@@ -157,4 +157,38 @@ test.describe("staff authentication", () => {
     expect(unknown.headers()["set-cookie"]).toBeUndefined();
     expect(wrong.headers()["set-cookie"]).toBeUndefined();
   });
+
+  test("login rate-limits the 11th attempt from one key (10 / 10 min)", async ({ request }) => {
+    // Session-12 T4: the login limiter (10 attempts / 10 min / key, keyed on
+    // the LAST X-Forwarded-For token) had no route-level pin — only the
+    // appointments limiter (5 / 10 min) was e2e-pinned. The spoofed XFF key
+    // is derived per run (session-10 F6 pattern) so a reused
+    // reuseExistingServer instance on :3100 can never poison the bucket.
+    // The 198.51.100.x range (TEST-NET-2) is disjoint from every fixed
+    // 203.0.113.x key in this file — no cross-spec collision is possible.
+    const headers = { "X-Forwarded-For": `198.51.100.${(Date.now() % 200) + 10}` };
+    const payload = {
+      email: E2E_ADMIN_EMAIL,
+      password: "definitely-not-the-password",
+    };
+
+    // Attempts 1..10: the limiter records each and lets them through to the
+    // (async-scrypt) credential check — generic 401 every time.
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      const response = await request.post("/api/auth/login", {
+        headers,
+        data: payload,
+      });
+      expect(response.status(), `attempt ${attempt}`).toBe(401);
+    }
+
+    // Attempt 11: over the limit — 429 with the documented message.
+    const throttled = await request.post("/api/auth/login", {
+      headers,
+      data: payload,
+    });
+    expect(throttled.status()).toBe(429);
+    const body = await throttled.json();
+    expect(body.error).toBe("Too many attempts. Please try again in a few minutes.");
+  });
 });

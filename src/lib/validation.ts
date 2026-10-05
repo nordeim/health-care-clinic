@@ -44,7 +44,15 @@ export const APPOINTMENT_SPECIALTIES: ReadonlySet<string> = new Set([
 ]);
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** Shared email sanity pattern — exported so the login route validates with
+ * the SAME regex (session-12 F9: the hand-copied inline literal in the route
+ * was a drift risk against this seam's "derived, never hand-copied"
+ * doctrine). */
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** RFC 5321 practical forward-path limit — the only bound on the otherwise
+ * unbounded email field (session-12 F1: a ~64 KiB pattern-valid email used
+ * to persist in a single row; every other field was already bounded). */
+export const EMAIL_MAX_LENGTH = 254;
 
 function asTrimmedString(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -102,10 +110,28 @@ export function validateAppointmentPayload(
   const email = asTrimmedString(record.email);
   if (email && !EMAIL_PATTERN.test(email)) {
     errors.email = "Enter a valid email address or leave it empty.";
+  } else if (email && email.length > EMAIL_MAX_LENGTH) {
+    // Session-12 F1: email was the only field without a maximum — the
+    // 64 KiB body cap was the sole ceiling, so one row could persist a
+    // pattern-valid ~64 KiB address (verified live pre-fix: 60,012 chars).
+    errors.email = "Email must be 254 characters or fewer.";
+  }
+
+  // Session-12 F7: a PRESENT-but-non-string specialty is a type error and
+  // must 422 — {"specialty": 42} used to coerce to the "Primary Care"
+  // default and silently persist fabricated data. Only missing/nullish/
+  // empty values keep the documented default (mirrors the form's initial
+  // selection semantics).
+  if (
+    record.specialty !== undefined &&
+    record.specialty !== null &&
+    typeof record.specialty !== "string"
+  ) {
+    errors.specialty = "Choose a specialty from the list.";
   }
 
   const specialty = asTrimmedString(record.specialty) ?? "Primary Care";
-  if (!APPOINTMENT_SPECIALTIES.has(specialty)) {
+  if (!errors.specialty && !APPOINTMENT_SPECIALTIES.has(specialty)) {
     errors.specialty = "Choose a specialty from the list.";
   }
 
@@ -119,14 +145,11 @@ export function validateAppointmentPayload(
     // "today" — which is already the server's "yesterday". Accepting one
     // day of drift keeps their booking valid; anything older is still a
     // stale request and rejected.
-    const floor = new Date(now);
-    floor.setHours(0, 0, 0, 0);
-    floor.setDate(floor.getDate() - 1);
+    const floor = toleranceFloorDate(now);
     if (!valid || parsed < floor) {
       errors.preferredDate = "Pick today or a future date.";
     }
   }
-
   if (Object.keys(errors).length > 0) {
     return { ok: false, fields: errors };
   }
@@ -141,4 +164,30 @@ export function validateAppointmentPayload(
       preferredDate,
     },
   };
+}
+
+/** Server-local midnight minus one day — the shared west-of-server
+ * tolerance floor. The preferredDate validation above compares Date
+ * objects against it; the dashboard's upcoming-visits stat (below)
+ * compares ISO strings. One helper, two projections — the API's acceptance
+ * rule and the stat's inclusion rule can never drift apart again
+ * (session-12 F6: the stat used to count >= server-TODAY while the seam
+ * deliberately accepts yesterday, so tolerated rows vanished from the
+ * stat they belonged to). */
+function toleranceFloorDate(now: Date): Date {
+  const floor = new Date(now);
+  floor.setHours(0, 0, 0, 0);
+  floor.setDate(floor.getDate() - 1);
+  return floor;
+}
+
+/** The dashboard "Upcoming visits" floor as a YYYY-MM-DD ISO date —
+ * server-YESTERDAY, exactly matching the validation tolerance (see
+ * toleranceFloorDate). */
+export function upcomingVisitsFloor(now: Date = new Date()): string {
+  const floor = toleranceFloorDate(now);
+  const y = floor.getFullYear();
+  const m = String(floor.getMonth() + 1).padStart(2, "0");
+  const d = String(floor.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }

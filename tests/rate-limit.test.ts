@@ -212,4 +212,40 @@ describe("readJsonBody", () => {
       value: null,
     });
   });
+
+  // ---- session-12 F2: transport-error tolerance ----------------------------
+
+  it("returns 400 when the body stream errors mid-read (client abort, session-12 F2)", async () => {
+    // A client that hangs up mid-body makes reader.read() REJECT with a
+    // transport error (ECONNRESET et al.). The throw used to escape the seam
+    // and the route's call site entirely (both routes call readJsonBody
+    // OUTSIDE their try/catch) — an unhandled framework error plus a
+    // misleading access-log line. The seam must RESOLVE a 400 instead.
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"fullName":"Abort"'));
+        controller.error(new Error("aborted"));
+      },
+    });
+    const request = new Request("http://localhost/api/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: stream,
+      duplex: "half",
+    } as RequestInit);
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: false,
+      status: 400,
+    });
+  });
+
+  it("returns 400 for a POST with no body stream at all (session-12 T1)", async () => {
+    // new Request(...) without a body init leaves request.body === null —
+    // the branch had no unit pin before.
+    const request = new Request("http://localhost/api/x", { method: "POST" });
+    await expect(readJsonBody(request)).resolves.toEqual({
+      ok: false,
+      status: 400,
+    });
+  });
 });

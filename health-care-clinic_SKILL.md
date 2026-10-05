@@ -7,10 +7,11 @@ description: >
   dependency-free staff auth/dashboard extension. Captures the
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
-  methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8 and 10.
-version: 2.4.0
+  methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10
+  and 12.
+version: 2.5.0
 last_updated: 2026-10-05
-project_state: 76 unit tests + 37 e2e tests green; HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, non-object body tolerance on both POST routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection); env-leak guard active (env -u)
+project_state: 85 unit tests + 38 e2e tests green; HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on both POST routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254); env-leak guard active (env -u); lint gate honest (13 correctness rules ON, every off documented)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -624,3 +625,34 @@ sessions · ADR-009 staff dashboard beyond parity (unlinked) · ADR-010
   1280×577 — set 1440×900 explicitly or heights mislead (7229px artifact
   observed and explained). 11 screenshots refreshed from the remediated
   dev server.
+- **Session 12** (email bound + transport tolerance + lint-gate honesty):
+  the fresh-eyes audit found the email field was the only UNBOUNDED payload
+  field (a pattern-valid 60,012-char email persisted — verified live), that
+  transport read errors (client aborts mid-body, ECONNRESET) escaped
+  `readJsonBody` AND both routes' try/catch blocks as unhandled framework
+  errors (verified live with a raw-socket abort probe), that the "lint 0"
+  gate ran with ~24 rules silently disabled, and four smaller gaps (logout
+  fetch without a catch, `reactStrictMode` off without rationale, the
+  "Upcoming visits" stat stricter than the validation tolerance, non-string
+  `specialty` silently coercing to the default, seed's dead-code
+  disconnect, login's hand-copied email regex). Remediated TDD-first:
+  `EMAIL_MAX_LENGTH = 254` in `validation.ts` (255 → 422, 254 → 201 — unit
+  and live boundary probes), the read loop inside a try/catch (stream
+  rejection → cancel best-effort → 400; the routes now always resolve),
+  specialty type tightening (present-but-non-string → 422; missing/nullish
+  keep the default), `upcomingVisitsFloor()` sharing
+  `toleranceFloorDate()` with the preferredDate validation so the stat and
+  the API can never disagree, the logout `.catch`, seed
+  `process.exitCode`, the login route importing the seam's
+  `EMAIL_PATTERN`, and a rewritten `eslint.config.mjs` with 13
+  correctness/dep-safety rules ON (every one at 0 findings — the
+  session-8/10 manual effect audits held) and every remaining off
+  documented (no-undef: TS type-only globals false-positive; no-img-element:
+  parity `<img>` ports; style noise). The three real
+  `no-html-link-for-pages` hits fixed by converting to `next/link`
+  (login `/#contact`, legal back-link, dashboard "View site"). New login
+  limiter e2e pin: 10 × 401 then 429 under a per-run 198.51.100.x spoofed
+  XFF key (disjoint from every fixed key in the file). Unit suite 76 → 85;
+  e2e 37 → 38. Live parity re-verified byte-exact (mobile link-click
+  0.421875 on BOTH sites, same session, same method; 7490px); 20
+  screenshots refreshed (03-desktop-full is exactly 1440×7490).

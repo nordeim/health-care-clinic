@@ -9,7 +9,7 @@ Every line answers: "would an agent likely miss this without help?"
 | ---- | ------- |
 | Install | `bun install` (then `bun pm trust --all` if postinstalls were blocked) |
 | Dev server | `bun run dev` → http://localhost:3000 (writes `dev.log`) |
-| Lint | `bun run lint` |
+| Lint | `bun run lint` (13 correctness rules ON; every off documented in the config — session-12 F3) |
 | Typecheck | `bun run typecheck` |
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
 | E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB) |
@@ -118,11 +118,21 @@ stays byte-faithful. All marketing copy lives in
   keys on the LAST `X-Forwarded-For` token (the proxy-appended address);
   `readJsonBody` STREAM-READS with the 64 KiB cap for every transport
   shape (content-length is only a fast path — chunked bodies are capped
-  mid-stream and the socket is cancelled). Both POST routes tolerate
+  mid-stream, the socket is cancelled on breach, and TRANSPORT errors
+  (client aborts mid-body) degrade to a 400 instead of escaping as
+  unhandled framework errors — session-12 F2). Both POST routes tolerate
   non-object JSON bodies (null/scalars) with a 422 field map — never
   `request.json()` directly. The login route ALWAYS burns scrypt
   (`verifyLoginPassword` + DUMMY_HASH in `src/lib/auth.ts`) — never
   short-circuit around it, or the timing-enumeration oracle returns.
+- The validation seam (`src/lib/validation.ts`) bounds EVERY field:
+  fullName 3–120, phone 7–32, email ≤ 254 (`EMAIL_MAX_LENGTH`, RFC 5321)
+  AND pattern-checked with the shared exported `EMAIL_PATTERN` (the login
+  route imports it — never hand-copy the regex); specialty is allowlisted
+  AND type-checked (a present-but-non-string value 422s instead of
+  silently defaulting — session-12 F7); the preferredDate tolerance floor
+  and the dashboard's upcoming-visits stat share `toleranceFloorDate()`
+  so the two contracts cannot drift apart.
 - Section ids are a public contract: `#top #about #services #insurance
   #providers #contact #faq` — the nav, scroll-spy, CTAs and e2e specs all
   depend on them.

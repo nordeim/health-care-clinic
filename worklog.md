@@ -180,3 +180,29 @@ Work Log:
 Stage Summary:
 - Repo @ <SHA> (main, pushed & remote-verified); HTTP edge fully closed (cap holds for every transport shape), login route hardened, event loop responsive under auth bursts
 - Full detail: repo worklog.md (Task ID 8) + docs/session_10.md + docs/remediation-plan-session10.md
+
+---
+Task ID: 9
+Agent: Super Z (main orchestrator)
+Task: Session 12 (continuation) — email-field bound, transport-error tolerance, lint-gate honesty, contract tightening, parity re-verification, SSH push
+
+Work Log:
+- Workspace reset with sandbox; re-cloned to d11c8a3 (session-10 tree 134b9c6 + docs-only session_11.md transcript paste); environment rebuilt (.env with \$-escaped operator credentials + generated AUTH_SECRET, bun install, db:push/db:seed); baseline gates green (lint/tsc/76 unit/build identical routes/37 e2e)
+- Fresh-eyes audit (read-only sub-agent + orchestrator re-verification): 9 NEW findings, zero regressions of documented fixes — F1 email unbounded (60,012-char email → 201, verified live), F2 transport read errors escape readJsonBody + routes unhandled (ECONNRESET verified live via raw-socket abort), F3 lint gate ~24 rules silently disabled, F4 logout fetch no catch, F5 reactStrictMode undocumented, F6 upcoming-visits stat stricter than validation tolerance, F7 non-string specialty silently coerces to default, F8 seed dead-code disconnect, F9 login route hand-copied email regex
+- Live parity probes (agent-browser, both sites, 1440x900 + 390x844): byte-exact (7490px; mobile panel 192x148 @ (178,80); link-click servicesTop 0.421875 BOTH — same-session same-method); session-10 fixes re-probed (chunked 413, null-body 422); product loop green; ambient DATABASE_URL hijack still ACTIVE (orchestrator's own un-guarded probe redirected — Error 14 — re-ran with env -u)
+- Wrote docs/remediation-plan-session12.md; executed TDD-first (Red confirmed: 6 failing tests across 3 phases):
+  * EMAIL_MAX_LENGTH=254 in validation.ts (255→422, 254→201 — unit + live boundary probes)
+  * readJsonBody read loop in try/catch — stream rejection → cancel + 400 (rejecting-ReadableStream unit test; live abort probe shows no unhandled error) + bodyless-request 400 pin (T1)
+  * specialty type tightening: present-but-non-string → 422; missing/nullish/empty keep the default (both unit-pinned)
+  * upcomingVisitsFloor(now) pure export sharing toleranceFloorDate with the preferredDate validation; dashboard stat counts server-yesterday forward (F6) — month/leap rollover unit-pinned
+  * logout-button .catch (F4); seed exitCode instead of process.exit (F8); login route imports EMAIL_PATTERN (F9)
+  * eslint.config.mjs rewritten: 13 correctness rules ON (all 0 findings), every remaining off documented with rationale (F3); 3 real no-html-link-for-pages hits fixed via next/link conversion (login #contact link, legal back-link, dashboard View site); reactStrictMode rationale comment (F5)
+  * login limiter e2e pin: 10×401 + 11th→429 under per-run 198.51.100.x spoofed XFF key (disjoint from all fixed keys) (T4)
+- Final gate: lint 0 (strengthened ruleset) / tsc true-strict / 85 unit (76+9) / build identical routes / 38 e2e (37+1); live re-probes: 60KiB email→422, abort→no unhandled error, specialty 42→422, 254/255 boundary exact; parity spot-checks unchanged; product loop green
+- Audit probe rows purged from dev DB (3 realistic rows seeded for screenshots); 20 screenshots refreshed (03-desktop-full = 1440x7490 exactly)
+- Docs: session_12.md, remediation-plan-session12.md, worklog entry, SKILL.md v2.5.0, PAD [S12], README/CLAUDE/AGENTS updates; .env.example re-verified (no env changes)
+- Committed on main; pushed via docs/ssh_git_wrapper_v3.py (explicit --remote, paramiko shim); dry-run first; remote verified == HEAD; operator key shredded
+
+Stage Summary:
+- Repo @ main (pushed & remote-verified); email bound at 254, transport errors degrade to 400, lint gate honest and stronger, stat/tolerance contracts unified by a shared floor, login limiter route-pinned
+- Full detail: repo worklog.md (Task ID 9) + docs/session_12.md + docs/remediation-plan-session12.md

@@ -124,12 +124,14 @@ non-obvious-rules list; this file holds the reasoning.
   contract (`tests/deps.test.ts`, 4 cases: runtime/dev allowlist set
   equality, no removed scaffold package creeps back, `scripts/` holds only
   `seed.ts`), the appointment validation seam (`tests/validation.test.ts`,
-  20 cases: impossible-calendar-date rejection, specialty allowlist
+  27 cases: impossible-calendar-date rejection, specialty allowlist
   derived from content.ts, bounds and defaulting, west-of-server
-  timezone tolerance), and the rate-limit seam
-  (`tests/rate-limit.test.ts`, 18 cases: last-token XFF keying, window
+  timezone tolerance, the email length bound at 254, specialty type
+  tightening, the upcoming-visits floor), and the rate-limit seam
+  (`tests/rate-limit.test.ts`, 20 cases: last-token XFF keying, window
   expiry, max boundary, the stream-read 64 KiB body cap including the
-  chunked/no-content-length shape and the exact boundary).
+  chunked/no-content-length shape and the exact boundary, transport-error
+  tolerance, the bodyless-request pin).
 - **E2E (Playwright):** five spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
@@ -140,7 +142,9 @@ non-obvious-rules list; this file holds the reasoning.
   dashboard guard, logout, full public-form→dashboard loop, enumeration
   parity, non-object body tolerance). Single worker, shared scratch DB
   (`db/e2e.db`), standalone server on :3100; limiter specs use per-run
-  spoofed XFF keys so a reused server can never poison buckets.
+  spoofed XFF keys so a reused server can never poison buckets. The auth
+  spec also pins the login limiter's 429 (10 attempts / 10 min, per-run
+  198.51.100.x spoofed key — disjoint from every fixed key in the file).
 - **Parity methodology:** computed-style assertions must read the right
   property per engine (v4 uses standalone `rotate`/`scale` properties);
   colors are rasterized to pixels (oklab vs rgba string formats), never
@@ -215,8 +219,9 @@ reference copy today). Do not inline copy edits into components.
 
 ## Success Metrics
 
-- Verification gate green (lint 0, tsc 0 under true strict, 76/76 unit,
-  build OK, 37/37 e2e).
+- Verification gate green (lint 0 under the strengthened ruleset — 13
+  correctness rules ON, documented offs only — tsc 0 under true strict,
+  85/85 unit, build OK, 38/38 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

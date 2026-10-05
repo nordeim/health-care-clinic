@@ -14,7 +14,11 @@ export function LogoutButton() {
   async function onLogout() {
     setBusy(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      // Session-12 F4: swallow transport failure — the finally still
+      // navigates to /login, so an unreachable logout endpoint must not
+      // surface as an unhandled promise rejection (console noise, zero
+      // user impact: the cookie simply lives until its expiry).
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     } finally {
       router.replace("/login");
       router.refresh();

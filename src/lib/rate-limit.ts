@@ -115,16 +115,28 @@ export async function readJsonBody(request: Request): Promise<JsonBodyResult> {
 
   const chunks: Uint8Array[] = [];
   let received = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    received += value.byteLength;
-    if (received > MAX_BODY_BYTES) {
-      // Cancel releases the socket instead of draining an oversized body.
-      await reader.cancel().catch(() => {});
-      return { ok: false, status: 413 };
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > MAX_BODY_BYTES) {
+        // Cancel releases the socket instead of draining an oversized body.
+        await reader.cancel().catch(() => {});
+        return { ok: false, status: 413 };
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } catch {
+    // Transport-level failure (session-12 F2): a client that hangs up
+    // mid-body rejects reader.read() with a socket error (ECONNRESET et
+    // al.). The throw used to escape the seam AND the routes' call sites
+    // (both call readJsonBody outside their try/catch) — an unhandled
+    // framework error plus a misleading 200 access-log line. Cancel
+    // best-effort and degrade to the standard 400: the request never
+    // completed, so it is indistinguishable from an unparseable body.
+    await reader.cancel().catch(() => {});
+    return { ok: false, status: 400 };
   }
 
   const buffer = new Uint8Array(received);

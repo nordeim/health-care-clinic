@@ -19,6 +19,7 @@
 - `[S6]` Session-6 scaffold cleanup (see `docs/remediation-plan-session6.md`): the pre-clone legacy removed — 14 ORBITAL-era scripts out of `scripts/` (kept `seed.ts`), 15 unused scaffold dependencies (8× @radix-ui, cva, clsx, tailwind-merge, tailwindcss-animate, tw-animate-css, zustand, z-ai-web-dev-sdk) plus the dead shadcn `components.json`, and the two committed ssh shims that violated the push runbook's "never commit the shim" rule. The dependency allowlist is now pinned by `tests/deps.test.ts` (unit suite 29 → 33). Cleanup proven behavior-neutral: identical build route table, 28/28 e2e, live parity byte-exact before and after; product loop re-verified under an active ambient `DATABASE_URL` hijack value.
 - `[S8]` Session-8 HTTP-edge hardening (see `docs/remediation-plan-session8.md`): a fresh-eyes audit surfaced the login user-enumeration TIMING oracle (unknown email short-circuited scrypt), first-token XFF rate-limit keying, the client discarding the 422 field map, impossible calendar dates passing via JS Date rollover, reveal content lost on client-bundle failure, the heartbeat animation's missing reduced-motion guard, and a tel: href parity deviation. Remediated TDD-first with two new pure seams (`src/lib/validation.ts` — calendar round-trip rejection + specialty allowlist derived from content.ts; `src/lib/rate-limit.ts` — LAST-token XFF keying + fixed-window limiter + 64 KiB body cap), `DUMMY_HASH`/`verifyLoginPassword` timing equalization in auth.ts, per-field 422 rendering with aria wiring in both forms, the reveal self-heal timer (inline script, cancelled by the first Reveal mount), true TS strict (noImplicitAny; ignoreBuildErrors removed so the build enforces types), `metadataBase` wired to NEXT_PUBLIC_SITE_URL, `@types/node` declared, and an explicit playwright AUTH_SECRET. Unit suite 33 → 65; e2e 28 → 34; live parity re-verified byte-exact; product loop green under the active ambient hijack.
 - `[S10]` Session-10 edge closure + robustness (see `docs/remediation-plan-session10.md`): the fresh-eyes audit found what session 8's own hardening had left half-open — `POST /api/auth/login` 500'd on a JSON `null` body (property access outside the parse try/catch), the 64 KiB body cap trusted only `content-length` so CHUNKED requests bypassed it entirely (verified live: a 70 KiB chunked POST buffered and parsed), and `scryptSync` blocked the event loop ~30-50 ms per login attempt (spoofed-key bursts starved every concurrent request). Remediated TDD-first: `readJsonBody` seam in `rate-limit.ts` (stream-read with the hard byte cap for every transport shape, socket cancelled on breach), the login non-object-body guard (422 field map, e2e-pinned on both routes), `promisify(scrypt)` (identical CPU on the libuv threadpool — DUMMY_HASH and the timing-equalization contract untouched; verified live: health polls interleave during concurrent scrypt logins), a one-day west-of-server timezone tolerance on the not-in-the-past floor, `src/lib/motion.ts` `scrollBehavior()` for reduced-motion instant jumps in both CTA handlers, and per-run spoofed XFF keys in the limiter e2e specs (a `reuseExistingServer` instance can no longer poison buckets). Unit suite 65 → 76; e2e 34 → 37; live parity re-verified byte-exact (mobile link-click identical to the pixel, same session, same method); product loop green under the still-active ambient hijack; 11 screenshots refreshed.
+- `[S12]` Session-12 email bound + transport tolerance + lint-gate honesty (see `docs/remediation-plan-session12.md`): the fresh-eyes audit found the email field was the only UNBOUNDED payload field (a pattern-valid 60,012-char email persisted — verified live), transport read errors escaped `readJsonBody` and both routes' try/catch as unhandled framework errors (ECONNRESET verified live via a raw-socket mid-body abort), the "lint 0" gate ran with ~24 rules silently disabled, plus: logout fetch without a catch, `reactStrictMode` off without recorded rationale, the "Upcoming visits" stat stricter than the validation tolerance, a non-string `specialty` silently coercing to the default (`{"specialty":42}` → 201 "Primary Care"), seed's dead-code disconnect, and the login route's hand-copied email regex. Remediated TDD-first: `EMAIL_MAX_LENGTH = 254` (255 → 422, 254 → 201, boundary live-probed), the read loop wrapped so transport failures cancel and degrade to 400 (routes always resolve now), specialty type tightening (present-but-non-string → 422; missing/nullish keep the default), `upcomingVisitsFloor()` sharing `toleranceFloorDate()` with the preferredDate validation (stat and API can never disagree), logout `.catch`, seed `process.exitCode`, login importing the seam's `EMAIL_PATTERN`, and a rewritten `eslint.config.mjs` — 13 correctness/dep-safety rules ON at 0 findings, every remaining off documented (no-undef: TS type-only globals; no-img-element: parity `<img>` ports). The three real `no-html-link-for-pages` hits converted to `next/link`. New login-limiter e2e pin (10 × 401 then 429 under a per-run 198.51.100.x spoofed key). Unit suite 76 → 85; e2e 37 → 38; live parity re-verified byte-exact (7490px; mobile link-click 0.421875 both sites); 20 screenshots refreshed.
 
 ---
 
@@ -612,12 +613,12 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 
 | Category | Files | Tests | Location | Framework |
 | -------- | ----- | ----- | -------- | --------- |
-| Unit (pure seams) | 5 | 76 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (20, incl. timezone tolerance), `tests/rate-limit.test.ts` (18, incl. stream-read body cap) | Vitest |
+| Unit (pure seams) | 5 | 85 | `tests/db-path.test.ts` (15), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin) | Vitest |
 | E2E chrome contract | 1 | 7 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
 | E2E landing parity | 1 | 11 | `tests/e2e/landing.spec.ts` (incl. title + tel: pins, reduced-motion instant-jump pin) | Playwright |
 | E2E write path | 1 | 9 | `tests/e2e/appointment-form.spec.ts` (incl. 422 UI, 429, 413, impossible dates, non-object body) | Playwright |
 | E2E legal pages | 1 | 3 | `tests/e2e/legal-pages.spec.ts` (incl. title pins) | Playwright |
-| E2E auth loop | 1 | 7 | `tests/e2e/auth.spec.ts` (incl. enumeration parity, cookie flags, non-object body) | Playwright |
+| E2E auth loop | 1 | 8 | `tests/e2e/auth.spec.ts` (incl. enumeration parity, cookie flags, non-object body, login-limiter 429 pin) | Playwright |
 
 ### 7.2 Test Patterns
 
@@ -631,16 +632,16 @@ scaffold's NextAuth option and gate `/api/appointments` reads.
 ### 7.3 Coverage Thresholds
 
 No numeric threshold configured (content-rendering app; the meaningful
-coverage is the parity surface). The gate is pass/fail: 76/76 unit,
-37/37 e2e.
+coverage is the parity surface). The gate is pass/fail: 85/85 unit,
+38/38 e2e.
 
 ### 7.4 Pre-Push Checklist
 
-- [ ] `bun run lint` — 0 errors
+- [ ] `bun run lint` — 0 errors (strengthened ruleset: 13 correctness rules ON, documented offs only — session-12 F3)
 - [ ] `bun run typecheck` — clean (true strict)
-- [ ] `bun run test` — 76/76 (db-path 15 + auth 19 + deps 4 + validation 20 + rate-limit 18)
+- [ ] `bun run test` — 85/85 (db-path 15 + auth 19 + deps 4 + validation 27 + rate-limit 20)
 - [ ] `bun run build` — standalone output produced (types enforced — no ignoreBuildErrors)
-- [ ] `bun run test:e2e` — 37/37 (requires the build)
+- [ ] `bun run test:e2e` — 38/38 (requires the build)
 - [ ] `git status` clean of secrets/artifacts before commit
 
 ---

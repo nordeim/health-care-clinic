@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 /* Shared layout for the two legal pages (privacy policy, accessibility
  * statement) — ported from the reference: narrow article, back link,
@@ -16,12 +17,12 @@ export function LegalPage({
   return (
     <main className="min-h-screen bg-background px-5 py-16 text-foreground sm:px-8 lg:px-[60px] lg:py-24">
       <article className="mx-auto max-w-3xl">
-        <a
+        <Link
           href="/"
           className="text-sm font-semibold text-muted-foreground hover:text-foreground"
         >
           &larr; Back to Green Grove Family Clinic
-        </a>
+        </Link>
         <h1 className="mt-10 text-5xl font-medium tracking-[-.04em] sm:text-6xl">
           {title}
         </h1>

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { HeartPulse, CalendarDays, Phone, Mail } from "lucide-react";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
+import { upcomingVisitsFloor } from "@/lib/validation";
 import { LogoutButton } from "@/components/dashboard/logout-button";
 
 /* Staff dashboard — the review surface for the appointment requests captured
@@ -34,14 +36,6 @@ const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
-function todayIsoDate(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 export default async function DashboardPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
@@ -60,16 +54,21 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const today = todayIsoDate();
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
+
+  // Upcoming-visits floor mirrors the validation seam's west-of-server
+  // tolerance (server-YESTERDAY — see src/lib/validation.ts): every row
+  // the API deems valid belongs in the stat. Before session-12 F6 this
+  // counted >= server-TODAY, so tolerated rows vanished from the stat.
+  const upcomingFloor = upcomingVisitsFloor(new Date());
 
   const [total, newToday, upcoming, topSpecialties, appointments] =
     await Promise.all([
       db.appointment.count(),
       db.appointment.count({ where: { createdAt: { gte: startOfToday } } }),
       db.appointment.count({
-        where: { preferredDate: { gte: today } },
+        where: { preferredDate: { gte: upcomingFloor } },
       }),
       db.appointment.groupBy({
         by: ["specialty"],
@@ -120,12 +119,12 @@ export default async function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <a
+            <Link
               href="/"
               className="rounded-full border border-primary/30 px-5 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
             >
               View site
-            </a>
+            </Link>
             <LogoutButton />
           </div>
         </header>

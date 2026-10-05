@@ -138,6 +138,35 @@ describe("validateAppointmentPayload", () => {
     expect(good.ok).toBe(true);
   });
 
+  // ---- email: the session-12 F1 length bound ------------------------------
+
+  it("rejects a pattern-valid email over 254 characters (session-12 F1)", () => {
+    // The local part is pattern-valid (no spaces/@) but absurdly long —
+    // the only unbounded field before this bound: a single row could
+    // persist a ~64 KiB email (verified live: 60,012 chars → 201).
+    const longEmail = `${"a".repeat(247)}@example.com`; // 259 chars
+    expect(longEmail.length).toBe(259);
+    const result = validateAppointmentPayload(
+      { ...valid, email: longEmail },
+      fixedNow("2099-01-01"),
+    );
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.fields.email).toBe(
+      "Email must be 254 characters or fewer.",
+    );
+  });
+
+  it("accepts a pattern-valid email at exactly 254 characters (boundary)", () => {
+    // 254 = the RFC 5321 practical forward-path limit.
+    const boundaryEmail = `${"b".repeat(242)}@example.com`; // 254 chars
+    expect(boundaryEmail.length).toBe(254);
+    const result = validateAppointmentPayload(
+      { ...valid, email: boundaryEmail },
+      fixedNow("2099-01-01"),
+    );
+    expect(result.ok).toBe(true);
+  });
+
   // ---- specialty ----------------------------------------------------------
 
   it("rejects a specialty outside the published list", () => {
@@ -147,6 +176,36 @@ describe("validateAppointmentPayload", () => {
     );
     expect(result.ok).toBe(false);
     expect(!result.ok && result.fields.specialty).toBeTruthy();
+  });
+
+  it("rejects a present-but-non-string specialty instead of silently defaulting (session-12 F7)", () => {
+    // {"specialty": 42} used to coerce to the "Primary Care" default and
+    // persist — a WRONG TYPE on a defaulted field fabricated data. Only
+    // missing/nullish/empty values default now.
+    for (const specialty of [42, true, {}, []]) {
+      const result = validateAppointmentPayload(
+        { ...valid, specialty },
+        fixedNow("2099-01-01"),
+      );
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.fields.specialty).toBe(
+        "Choose a specialty from the list.",
+      );
+    }
+  });
+
+  it("still defaults the specialty for missing/empty values (defaulting unchanged)", () => {
+    // The tightened type guard must NOT narrow the documented default:
+    // the form's initial selection is "Primary Care", and an explicit
+    // empty string means "no choice made".
+    for (const specialty of [undefined, null, "", "   "]) {
+      const result = validateAppointmentPayload(
+        { ...valid, specialty },
+        fixedNow("2099-01-01"),
+      );
+      expect(result.ok).toBe(true);
+      expect(result.ok && result.value.specialty).toBe("Primary Care");
+    }
   });
 
   // ---- preferredDate: the F4 contract -------------------------------------
@@ -261,5 +320,38 @@ describe("validateAppointmentPayload", () => {
       expect(!result.ok && result.fields.fullName).toBe("Full name is required.");
       expect(!result.ok && result.fields.phone).toBe("Phone number is required.");
     }
+  });
+});
+
+// The dashboard's upcoming-visits floor (session-12 F6): the stat used to
+// count preferredDate >= server-TODAY while the validation seam deliberately
+// accepts YESTERDAY (the west-of-server patient's "today" — session-10 F4).
+// A tolerated row was persisted as valid yet excluded from the stat. The
+// floor is extracted as a pure function so the two contracts can never drift
+// apart silently again.
+describe("upcomingVisitsFloor", () => {
+  it("returns yesterday's ISO date — exactly the validation tolerance floor", async () => {
+    const { upcomingVisitsFloor } = await import("@/lib/validation");
+    // Mid-day anchor (local timezone): 2026-10-05 12:00 → floor 2026-10-04.
+    expect(upcomingVisitsFloor(new Date("2026-10-05T12:00:00"))).toBe(
+      "2026-10-04",
+    );
+  });
+
+  it("rolls back across a month boundary", async () => {
+    const { upcomingVisitsFloor } = await import("@/lib/validation");
+    expect(upcomingVisitsFloor(new Date("2026-03-01T12:00:00"))).toBe(
+      "2026-02-28",
+    );
+    // Leap-year February: 2028-03-01 minus one day → 2028-02-29.
+    expect(upcomingVisitsFloor(new Date("2028-03-01T12:00:00"))).toBe(
+      "2028-02-29",
+    );
+  });
+
+  it("always yields a YYYY-MM-DD string", async () => {
+    const { upcomingVisitsFloor } = await import("@/lib/validation");
+    const floor = upcomingVisitsFloor(new Date());
+    expect(floor).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
