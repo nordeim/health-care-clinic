@@ -1,0 +1,35 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+/* Logout control — the only interactive island on the dashboard page.
+ * Clears the session cookie via POST /api/auth/logout, then hard-navigates
+ * back to /login (a full reload so the Server Component guard re-runs). */
+
+export function LogoutButton() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function onLogout() {
+    setBusy(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.replace("/login");
+      router.refresh();
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onLogout}
+      disabled={busy}
+      className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+    >
+      {busy ? "Signing out…" : "Sign out"}
+    </button>
+  );
+}

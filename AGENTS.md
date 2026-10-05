@@ -14,6 +14,7 @@ Every line answers: "would an agent likely miss this without help?"
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
 | E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB) |
 | DB schema | `bun run db:push` (Prisma; SQLite at `db/custom.db`) |
+| Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) |
 | Production | `bun run build && bun .next/standalone/server.js` |
 
 **Verification gate (run before any push):**
@@ -28,7 +29,11 @@ Every line answers: "would an agent likely miss this without help?"
 Pixel-faithful clone of `https://health-care-clinic.base44.app/` (a
 Tailwind-v3 Vite SPA) rebuilt on **Next.js 16 App Router + Tailwind CSS
 v4 + Prisma/SQLite**. Landing page + two legal pages + one write path
-(`POST /api/appointments`). All marketing copy lives in
+(`POST /api/appointments`). The reference itself has NO login or dashboard
+(its route table is `/`, `/privacy-policy`, `/accessibility-statement`);
+the staff `/login` + `/dashboard` pair is a documented extension beyond
+parity — kept UNLINKED from the landing page so the public experience
+stays byte-faithful. All marketing copy lives in
 `src/lib/content.ts` — change it there, never inline in components.
 
 ## Non-obvious rules (the parts agents get wrong)
@@ -78,14 +83,31 @@ v4 + Prisma/SQLite**. Landing page + two legal pages + one write path
 8. **DB path resolution is a tested contract** (`src/lib/db-path.ts`,
    `tests/db-path.test.ts`): relative `file:` URLs resolve against the
    repo that owns `prisma/schema.prisma`. The dev environment may surface
-   a parent-directory `.env` (bun walks up); both locations resolve to a
-   valid, schema-pushed DB, so don't "fix" one path by breaking the other.
+   a parent-directory `.env` or an ambient exported `DATABASE_URL` (bun
+   walks up; shell env beats `.env` files) — that is exactly why the
+   `dev`/`build`/`db:*` npm scripts prefix `env -u DATABASE_URL`: the
+   repo `.env` stays authoritative. `start` (production standalone)
+   intentionally KEEPS ambient env per `docs/DEPLOYMENT.md` §4. Do not
+   remove the `env -u` guards — a stray exported variable silently
+   redirects writes to a database outside the repo.
+9. **Staff auth is dependency-free by design** (`src/lib/auth.ts`, pinned
+   by `tests/auth.test.ts`): scrypt password hashing + HMAC-SHA256 session
+   tokens from Node's crypto module — no external auth library. `AUTH_SECRET`
+   is required in production (signing throws without it); dev falls back to
+   a constant with a console warning. The login route returns a GENERIC 401
+   (never reveal whether the email exists) and rate-limits 10/10min/IP.
+   `/dashboard` guards itself as a Server Component (redirect to `/login`);
+   no middleware exists — don't add one without updating the ADR log.
+10. **dotenv `$` interpolation gotcha:** a value starting with `$` in `.env`
+    (e.g. `ADMIN_PASSWORD="$Abcd1234"`) resolves to `""` — escape it as
+    `\$`. This bit the seed script once; the troubleshooting table in
+    README records it.
 
 ## Conventions
 
 - Server Components by default; `"use client"` only for Header (menu +
   scroll-spy state), Hero (rotating badge), AppointmentForm (submit
-  states), Reveal (observer).
+  states), Reveal (observer), LoginForm and LogoutButton (auth islands).
 - Content (copy, icon maps, nav links) lives in `src/lib/content.ts` —
   single source of truth, `as const` tuples.
 - Section ids are a public contract: `#top #about #services #insurance
@@ -98,10 +120,18 @@ v4 + Prisma/SQLite**. Landing page + two legal pages + one write path
 
 ## Testing quirks
 
-- Playwright's `globalSetup` pushes the schema to `db/e2e.db`; specs run
-  single-worker (shared SQLite file). `test:e2e` requires a prior
+- Playwright's `globalSetup` pushes the schema to `db/e2e.db` and seeds the
+  e2e staff account (E2E_ADMIN_EMAIL/PASSWORD exported from global-setup.ts);
+  specs run single-worker (shared SQLite file). `test:e2e` requires a prior
   `bun run build` (standalone server).
 - The appointment happy-path test deliberately does NOT assert the
   in-flight "Sending…" state — it races a fast local API.
 - Headless hover checks are unreliable: v4 wraps `hover:` variants in
   `@media (hover: hover)`. Assert computed geometry, not hover paint.
+- `db/e2e.db` PERSISTS between runs (only the schema is re-pushed) — rows
+  accumulate. e2e specs that reference submitted rows must use unique
+  values per run (see auth.spec.ts) or they trip Playwright strict mode.
+- Next's route announcer carries `role=alert`; scope alert assertions to
+  the form (`page.locator("form").getByRole("alert")`).
+- The login happy-path never asserts the in-flight "Signing in…" label —
+  same fast-local-API race as the appointment form.

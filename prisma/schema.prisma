@@ -1,6 +1,9 @@
 // Green Grove Family Clinic — data model.
-// The landing page's single write path is the "Request an appointment" form:
-// POST /api/appointments -> validation -> Appointment row.
+// Two write paths:
+//   1. The landing page's "Request an appointment" form:
+//      POST /api/appointments -> validation -> Appointment row.
+//   2. Staff sign-in at /login: POST /api/auth/login -> scrypt verify ->
+//      session cookie. The single AdminUser row is seeded by db:seed.
 
 generator client {
   provider = "prisma-client-js"
@@ -23,4 +26,16 @@ model Appointment {
 
   @@index([createdAt])
   @@map("appointments")
+}
+
+// Staff account for the appointment dashboard. The password is NEVER stored
+// in plain text — hashPassword() stores `scrypt$salt$hash`. Seeded (or
+// updated) by `bun run db:seed` from ADMIN_EMAIL / ADMIN_PASSWORD in .env.
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  @@map("admin_users")
 }

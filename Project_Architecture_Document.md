@@ -9,11 +9,12 @@
 
 ---
 
-#### Revision Block — v1.0.0 (Tracked Changes)
+#### Revision Block — v1.1.0 (Tracked Changes)
 
 - `[SR]` Initial full PAD for the Next.js 16 reconstruction of the reference Base44 clinic site.
 - `[SR]` ADR-001..007 recorded: framework, rendering strategy, styling engine port, DB/ORM, API validation, reveal choreography, e2e trap guards.
 - `[SR]` Trap log cross-referenced with `docs/Tailwind-V4-Validation-Report.md` (five documented v3→v4 engine variances, all mitigated in this codebase).
+- `[S2]` Session-2 audit + remediation (see `docs/remediation-plan-session2.md`): ADR-008..010 recorded — dependency-free cookie session auth, the staff dashboard beyond-parity extension, and the `env -u DATABASE_URL` determinism guard. `.env.example` rewritten to match the codebase; `db:seed` added; auth unit + e2e layers added (29 unit / 27 e2e total).
 
 ---
 
@@ -177,6 +178,70 @@ with the reference at desktop and mobile widths.
 - **Alternatives Rejected:** Visual snapshot diffs (flake-prone against
   the video hero); comment-only warnings.
 
+**ADR-008: Dependency-free cookie sessions for the staff surface (scrypt + HMAC)**
+
+- **Context:** The staff login/dashboard needed authentication; the
+  obvious options were NextAuth/Auth.js or better-auth — both add
+  substantial dependency surface for a single-account admin tool on a
+  SQLite-backed standalone deployable.
+- **Decision:** `src/lib/auth.ts` implements both primitives with Node's
+  built-in crypto only: passwords stored as `scrypt$saltHex$hashHex`
+  (per-hash random salt, constant-time verify), sessions as
+  `v1.<adminId>.<exp>.<hmac>` tokens signed with `AUTH_SECRET` (dev falls
+  back to a constant + console warning; production signing throws when
+  unset). The cookie is httpOnly, SameSite=Lax, Secure-in-production,
+  7-day TTL. `/dashboard` guards itself as a Server Component (no
+  middleware) and re-checks that the admin row still exists (deleting the
+  account revokes outstanding cookies).
+- **Rationale:** Zero new runtime dependencies; every primitive is
+  unit-pinned (`tests/auth.test.ts`); the pattern matches the project's
+  manual-validation doctrine elsewhere.
+- **Consequences:** No rotation/revocation server side beyond account
+  deletion; single-process deployments only (matches ADR-005's shape);
+  AUTH_SECRET becomes a required production env var.
+- **Alternatives Rejected:** NextAuth (OAuth providers irrelevant);
+  better-auth (more surface than the problem); JWT libraries (same crypto,
+  more code); storing plaintext or reversible passwords (never).
+
+**ADR-009: Staff dashboard as a documented beyond-parity extension**
+
+- **Context:** The operator's brief expects a login + dashboard; the
+  reference app verifiably has neither (route table extracted from its SPA
+  bundle: `/`, `/privacy-policy`, `/accessibility-statement`, 404).
+- **Decision:** Build `/login` + `/dashboard` (stats cards + latest-100
+  requests table) styled with the site's own design system, and keep both
+  routes UNLINKED from the landing page so public parity is untouched.
+  `robots: noindex` on both.
+- **Rationale:** Closes the product loop the reference outsources (public
+  form → validated API → SQLite → staff review) while preserving the
+  byte-faithful public experience; the ambiguity is resolved in favor of
+  the operator's stated expectation, with the evidence documented.
+- **Consequences:** The dashboard is a review surface only — no edit/state
+  transitions yet (tracked in §10); e2e seeds its own staff account.
+- **Alternatives Rejected:** Skipping the feature (leaves the operator's
+  expectation unmet); linking login in the footer (would deviate from the
+  reference's DOM).
+
+**ADR-010: `env -u DATABASE_URL` determinism guard on dev/build/db scripts**
+
+- **Context:** Session-2 audit proved an ambient exported `DATABASE_URL`
+  (sandbox shell, absolute path outside the repo) silently overrides the
+  repo `.env` — process env beats dotenv — and redirected dev-server
+  writes to a database outside the repo.
+- **Decision:** The `dev`, `build`, `db:push`, `db:migrate`, `db:reset`
+  and `db:seed` npm scripts prefix `env -u DATABASE_URL`, making the
+  repo-local `.env` (resolved by `src/lib/db-path.ts`) authoritative.
+  The production `start` script deliberately KEEPS ambient env — the
+  deployment contract (DEPLOYMENT.md §4) injects an absolute URL there.
+- **Rationale:** Deterministic behavior for every documented entry point,
+  with zero application-code magic; production semantics unchanged.
+- **Consequences:** Ad-hoc direct invocations (`bun .next/standalone/
+  server.js` from a polluted shell) still read ambient env — documented,
+  acceptable (package.json scripts are the contract).
+- **Alternatives Rejected:** Changing `db-path.ts` precedence (would break
+  the documented absolute-URL deployment path); deleting the sandbox
+  artifact (reappears per session).
+
 ---
 
 ## 2. High-Level System Topology
@@ -190,16 +255,19 @@ flowchart TB
         Caddy[Dev gateway<br/>port 3000 only]
     end
     subgraph App[Next.js 16 standalone server]
-        RSC[Static pages<br/>/ /privacy-policy /accessibility-statement]
-        API[Dynamic route handlers<br/>POST /api/appointments<br/>GET /api/health]
+        RSC[Static pages<br/>/ /privacy-policy /accessibility-statement /login]
+        DASH[Session-guarded RSC<br/>GET /dashboard]
+        API[Dynamic route handlers<br/>POST /api/appointments<br/>GET /api/health<br/>POST /api/auth/login /logout]
     end
     subgraph Data
         P[Prisma Client singleton]
-        DB[(SQLite file<br/>db/custom.db)]
+        DB[(SQLite file<br/>db/custom.db<br/>appointments + admin_users)]
     end
     B --> Caddy --> RSC
+    B --> Caddy --> DASH
     B --> Caddy --> API
     API --> V[Validation + rate limiter] --> P --> DB
+    DASH --> AUTH[verifySession cookie check] --> P
     M[Static assets<br/>public/media: video, poster, photos] --> B
 ```
 
@@ -208,10 +276,14 @@ flowchart TB
 - **App layer:** one Node process (dev: `next dev`; production:
   `.next/standalone/server.js`). Static pages are prerendered; API routes
   are dynamic (force-dynamic by virtue of route handlers reading the DB).
-- **Data layer:** a single SQLite file; the Prisma client is a
+  The staff dashboard is a Server Component that verifies the signed
+  session cookie before reading any data (ADR-008/009).
+- **Data layer:** a single SQLite file (two tables after session-2:
+  `appointments`, `admin_users`); the Prisma client is a
   `globalThis` singleton in dev for hot-reload safety.
 - **External services:** none at runtime. All media is vendored locally
-  (`public/media/`) so the app is self-contained.
+  (`public/media/`) so the app is self-contained. Auth uses Node's
+  built-in crypto — no external auth provider.
 
 ---
 
@@ -633,7 +705,10 @@ bun run dev            # verify: curl localhost:3000/api/health
 | LOW | Radix UI dependencies installed but unused | bundle unaffected (tree-shaken), install weight only | Open — remove if budget tightens |
 | LOW | Dark token set ships without a UI toggle | none (inert CSS, mirrors reference) | Open by design |
 | LOW | Rate limiter is per-process memory | resets on restart; wrong under horizontal scaling (not the deployment shape) | Documented in §6 |
+| LOW | `braces` + `deepmerge-ts` dev-chain advisories | dev-time only (eslint/prisma tooling); no runtime exposure | Accepted — awaiting upstream fixes |
+| LOW | Dashboard is read-only (no status transitions on appointments) | staff can review but not mark confirmed/done | Backlog — natural next feature |
 | INFO | ±1/255 oklab quantization drift on opacity-modified colors | imperceptible; asserted with tolerance in e2e | Accepted (ADR-003) |
+| INFO | dotenv interpolates a leading `$` to empty string | seed credentials silently vanish if unescaped | Documented in README + `.env.example` (`\$`) |
 
 ---
 
@@ -641,16 +716,22 @@ bun run dev            # verify: curl localhost:3000/api/health
 
 | File | Lines | Purpose |
 | ---- | ----- | ------- |
-| `src/app/globals.css` | ~250 | Design system: tokens, unlayered base cascade, reveal CSS, custom classes |
-| `src/components/site/header.tsx` | ~180 | Fixed chrome: mobile menu, scroll-spy, pastHero color swap |
-| `src/components/site/services.tsx` | ~110 | Gradient band + stacked-entrance cards |
-| `src/components/site/appointment-form.tsx` | ~150 | The write path UI with submit states |
-| `src/components/site/reveal.tsx` | ~80 | Hydration-safe reveal choreography |
+| `src/app/globals.css` | ~280 | Design system: tokens, unlayered base cascade, reveal CSS, custom classes |
+| `src/components/site/header.tsx` | ~200 | Fixed chrome: mobile menu, scroll-spy, pastHero color swap |
+| `src/components/site/services.tsx` | ~90 | Gradient band + stacked-entrance cards |
+| `src/components/site/appointment-form.tsx` | ~165 | The write path UI with submit states |
+| `src/components/site/reveal.tsx` | ~70 | Hydration-safe reveal choreography |
 | `src/lib/content.ts` | ~190 | All site copy, icon maps, nav contracts |
+| `src/lib/auth.ts` | ~120 | scrypt + HMAC session primitives (unit-tested seam) |
 | `src/app/api/appointments/route.ts` | ~170 | Validation, rate limiting, persistence |
+| `src/app/api/auth/login/route.ts` | ~130 | Credential verify, session cookie, login limiter |
+| `src/app/dashboard/page.tsx` | ~210 | Session-guarded stats + appointments table (RSC) |
+| `scripts/seed.ts` | ~40 | db:seed staff account upsert |
 | `src/lib/db-path.ts` | ~110 | Pure SQLite URL resolution (tested seam) |
 | `tests/e2e/mobile-navigation.spec.ts` | ~170 | Chrome contract + Tailwind v4 trap guards |
+| `tests/e2e/auth.spec.ts` | ~110 | Full auth loop incl. public-form→dashboard visibility |
 | `docs/Tailwind-V4-Validation-Report.md` | ~310 | Authoritative engine trap log |
+| `docs/remediation-plan-session2.md` | — | Session-2 audit findings + remediation record |
 
 ---
 

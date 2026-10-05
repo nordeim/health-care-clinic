@@ -1,0 +1,140 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  SESSION_COOKIE,
+  SESSION_TTL_SECONDS,
+  hashPassword,
+  signSession,
+  verifyPassword,
+  verifySession,
+} from "@/lib/auth";
+
+/* Staff-auth pure seam (src/lib/auth.ts).
+ *
+ * Two independent primitives with different threat models:
+ *  - Password hashing: scrypt with a per-hash random salt. The stored string
+ *    must not be derivable from the password, and identical passwords must
+ *    hash differently (salt uniqueness).
+ *  - Session tokens: HMAC-SHA256 over `adminId.exp`, verified with a
+ *    constant-time comparison. Any mutation of the payload OR the signature
+ *    must invalidate the token, and expiry must be enforced.
+ * Both must work with an explicit secret so tests stay pure (no env
+ * dependency); the env fallback rule is covered separately. */
+
+describe("hashPassword / verifyPassword", () => {
+  it("round-trips a correct password", () => {
+    const stored = hashPassword("s3cret-Password!");
+    expect(stored).toMatch(/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
+    expect(verifyPassword("s3cret-Password!", stored)).toBe(true);
+  });
+
+  it("rejects a wrong password", () => {
+    const stored = hashPassword("s3cret-Password!");
+    expect(verifyPassword("s3cret-Password?", stored)).toBe(false);
+    expect(verifyPassword("", stored)).toBe(false);
+    expect(verifyPassword("s3cret-password!", stored)).toBe(false);
+  });
+
+  it("salts every hash — identical passwords never hash alike", () => {
+    const a = hashPassword("same-password");
+    const b = hashPassword("same-password");
+    expect(a).not.toBe(b);
+    expect(verifyPassword("same-password", a)).toBe(true);
+    expect(verifyPassword("same-password", b)).toBe(true);
+  });
+
+  it("rejects malformed stored hashes instead of throwing", () => {
+    expect(verifyPassword("x", "")).toBe(false);
+    expect(verifyPassword("x", "not-a-hash")).toBe(false);
+    expect(verifyPassword("x", "scrypt$zz$zz")).toBe(false);
+    expect(verifyPassword("x", "scrypt$deadbeef$deadbeef")).toBe(false);
+  });
+});
+
+describe("signSession / verifySession", () => {
+  it("round-trips a fresh token", () => {
+    const token = signSession("admin-123", undefined, "test-secret");
+    const session = verifySession(token, "test-secret");
+    expect(session).toEqual({ adminId: "admin-123" });
+  });
+
+  it("honours a custom TTL (expiry enforced)", () => {
+    const token = signSession("admin-123", -1, "test-secret"); // already expired
+    expect(verifySession(token, "test-secret")).toBeNull();
+  });
+
+  it("uses the documented default TTL", () => {
+    expect(SESSION_TTL_SECONDS).toBe(7 * 24 * 60 * 60);
+    // A default-TTL token stays valid now and carries exp ≈ now + ttl.
+    const token = signSession("admin-123", undefined, "test-secret");
+    const exp = Number(token.split(".")[2]);
+    const now = Math.floor(Date.now() / 1000);
+    expect(exp).toBeGreaterThan(now + SESSION_TTL_SECONDS - 5);
+    expect(exp).toBeLessThan(now + SESSION_TTL_SECONDS + 5);
+  });
+
+  it("rejects a tampered adminId (signature no longer matches)", () => {
+    const token = signSession("admin-123", undefined, "test-secret");
+    const parts = token.split(".");
+    parts[1] = "admin-999";
+    expect(verifySession(parts.join("."), "test-secret")).toBeNull();
+  });
+
+  it("rejects a tampered expiry", () => {
+    const token = signSession("admin-123", 60, "test-secret");
+    const parts = token.split(".");
+    parts[2] = String(Number(parts[2]) + 3600);
+    expect(verifySession(parts.join("."), "test-secret")).toBeNull();
+  });
+
+  it("rejects a token signed with a different secret", () => {
+    const token = signSession("admin-123", undefined, "secret-a");
+    expect(verifySession(token, "secret-b")).toBeNull();
+  });
+
+  it("rejects malformed tokens without throwing", () => {
+    expect(verifySession("", "test-secret")).toBeNull();
+    expect(verifySession("v1", "test-secret")).toBeNull();
+    expect(verifySession("v1.only-two", "test-secret")).toBeNull();
+    expect(verifySession("v2.a.b.c", "test-secret")).toBeNull();
+    expect(verifySession("not.a.token", "test-secret")).toBeNull();
+  });
+});
+
+describe("secret resolution from the environment", () => {
+  // TS types process.env as read-only under the active type packages; the
+  // runtime allows mutation, which these env-reshaping tests rely on.
+  const mutableEnv = process.env as Record<string, string | undefined>;
+  const original = mutableEnv.AUTH_SECRET;
+  const originalNodeEnv = mutableEnv.NODE_ENV;
+
+  beforeEach(() => {
+    delete mutableEnv.AUTH_SECRET;
+  });
+
+  afterEach(() => {
+    if (original === undefined) delete mutableEnv.AUTH_SECRET;
+    else mutableEnv.AUTH_SECRET = original;
+    if (originalNodeEnv === undefined) delete mutableEnv.NODE_ENV;
+    else mutableEnv.NODE_ENV = originalNodeEnv;
+  });
+
+  it("falls back to a dev constant when AUTH_SECRET is unset (dev only)", () => {
+    mutableEnv.NODE_ENV = "development";
+    const token = signSession("admin-123");
+    expect(verifySession(token)).toEqual({ adminId: "admin-123" });
+  });
+
+  it("reads AUTH_SECRET from the environment when present", () => {
+    mutableEnv.NODE_ENV = "development";
+    mutableEnv.AUTH_SECRET = "from-env";
+    const token = signSession("admin-123");
+    expect(verifySession(token, "from-env")).toEqual({ adminId: "admin-123" });
+    expect(verifySession(token, "other")).toBeNull();
+  });
+});
+
+describe("session cookie contract", () => {
+  it("uses the documented cookie name", () => {
+    expect(SESSION_COOKIE).toBe("clinic_session");
+  });
+});
