@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14, 16, 18, 20, 22 and 24.
-version: 2.8.3
+  12, 14, 16, 18, 20, 22, 24 and 26.
+version: 2.8.4
 last_updated: 2026-10-06
-project_state: 99 unit tests + 44 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact)
+project_state: 99 unit tests + 44 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -270,8 +270,10 @@ No runtime external requests.
 - Mobile menu: full ARIA contract (`aria-expanded`, `aria-controls`,
   label swap Open/Close, Escape restores focus to the trigger).
 - FAQ: native `<details>/<summary>` with rotating plus glyph.
-- Forms: real `<label>` wrapping (e2e asserts `getByLabel`), `role=alert`
-  errors, `aria-live` regions on success states.
+- Forms: accessible names via real `<label>` wrapping (the staff login
+  form) and `aria-label` (the public appointment form — a verbatim parity
+  port of the reference markup); e2e asserts `getByLabel` against both.
+  `role=alert` errors, `aria-live` regions on success states.
 - Dashboard table: `<th scope="col">` headers, `<td>` alignment.
 - Focus states: v4 default ring tokens; nothing suppressed.
 - `viewport-fit=cover` + `themeColor` for notched devices.
@@ -875,3 +877,42 @@ p8; link-click 0.421875 + scrollY 1837 BOTH; mobile height 12162 vs 12164
 under the still-active ambient DATABASE_URL hijack; 20 screenshots
 refreshed (03-desktop-full exactly 1440×7490; dashboards show the restored
 6 seed rows).
+
+### Session 26 — E2E time-erosion closure, PAD count residuals, seed-state restore (v2.8.4)
+
+Fresh-eyes audit (14th; 6 findings: 4 Low, 2 Info, zero
+Critical/High/Medium, zero regressions) found a defect class thirteen prior
+audits never checked for: **time-eroded e2e assertions**. The
+impossible-dates pin's hardcoded 2025 literals had fallen into the past, so
+their JS-rollover targets were past too — the "not in the past" floor alone
+produced the asserted 422 even with the calendar round-trip check fully
+broken (empirically proven: the RED-0 run — `isRealCalendarDate` forced to
+`valid: true`, rebuilt, and the old test still PASSED). Remediated
+TDD-first: the pin now computes `new Date().getFullYear() + 1` literals,
+whose rollover targets are always future — only the round-trip check can
+reject them, forever; the new pin was proven RED against the same broken
+seam (201 ≠ 422 → fail) before going GREEN on the restored one (the
+deliberate seam patch reverted verbatim — `git diff` clean; the RED run's
+persisted garbage row purged from db/e2e.db). Plus: PAD §7.1's landing row
+corrected 12 → 13 (the session-24 count pass missed the per-spec
+breakdown — rows summed to 43 against the doc's own 44), PAD §11's
+Validation Report row re-measured ~334 → ~361 (stale since session-24
+appended 27 lines to that file without re-measuring), SKILL §8's forms row
+reworded to the honest two-form reality (`<label>` wrapping on login,
+`aria-label` on the appointment form — a verbatim parity port), PAD §3.2's
+transcript ranges rephrased as open-ended families (kills the
+every-session stale-range class at the root), and the 6 realistic seed rows
+restored through the PUBLIC API (unique 198.51.117-119.x XFF keys) with
+statuses via the real PATCH API (2 confirmed / 2 new / 2 completed — third
+recurrence of the workspace-reset class). Unit 99 (unchanged); e2e 44
+(unchanged) + the DOUBLE-consecutive-run proof re-held (44/44 × 2); live
+parity re-verified byte-exact on both sites at verified viewports (desktop
+7490px both; mobile panel 192×148 @ (178,80) grid r24 p8; link-click
+0.421875 + scrollY 1837 BOTH; mobile height 12162 vs 12164 — the
+documented 2px contact-section drift); pixel-rasterized dropdown
+[38,74,57,230] exact; the full product loop with status transitions green
+under the still-active ambient DATABASE_URL hijack (re-proven twice: an
+ad-hoc Prisma query without `env -u` failed with SQLite error 14 exactly as
+ADR-010 documents); 20 screenshots refreshed (03-desktop-full exactly
+1440×7490; dashboards show the restored 6 seed rows; the capture's
+submission rows purged after).

@@ -123,9 +123,22 @@ test.describe("appointment form", () => {
   });
 
   test("server-side validation rejects impossible calendar dates (no JS rollover)", async ({ request }) => {
-    // 2025-02-31 used to parse as March 3 and PERSIST as garbage — the
-    // validation seam now round-trips the components (session-8 F4).
-    for (const preferredDate of ["2025-02-31", "2025-04-31", "2025-02-30"]) {
+    // Impossible dates in a FUTURE year: the JS rollover targets (e.g.
+    // Mar 3 of futureYear) are themselves future dates, so ONLY the
+    // component round-trip check can reject these — the not-in-the-past
+    // floor can never mask a round-trip regression. (Session-26 F4: the
+    // original hardcoded 2025 literals eroded into exactly that tautology
+    // once 2025 fell into the past — the test passed with the round-trip
+    // check fully broken. Computing the year keeps the pin's discriminating
+    // power forever; the unit seam covers the same rule with an injected
+    // clock.) 2025-02-31 used to parse as March 3 and PERSIST as garbage —
+    // the validation seam now round-trips the components (session-8 F4).
+    const futureYear = new Date().getFullYear() + 1;
+    for (const preferredDate of [
+      `${futureYear}-02-31`,
+      `${futureYear}-04-31`,
+      `${futureYear}-02-30`,
+    ]) {
       const response = await request.post("/api/appointments", {
         headers: { "X-Forwarded-For": DATES_KEY },
         data: {
