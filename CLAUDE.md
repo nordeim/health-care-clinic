@@ -76,7 +76,9 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 - `prisma/` — schema (Appointment + AdminUser models)
 - `scripts/seed.ts` — `db:seed` staff account upsert (+ opt-in
   `SEED_DEMO=1`/`--demo` mode restoring the 6 demo dashboard rows)
-- `tests/e2e/` — Playwright specs; `tests/*.test.ts` — Vitest seams
+- `tests/e2e/` — Playwright specs; `tests/*.test.ts` — Vitest seams;
+  `tests/helpers/` — test-only seams shared with the e2e layer (the
+  baked-origin derivation — session-42)
 
 ### Naming Conventions
 
@@ -177,10 +179,19 @@ non-obvious-rules list; this file holds the reasoning.
   formula-injection guard cases and the `urlSearchParamsToRecord`
   duplicate-key first-wins round-trip — session-36; plus the UTF-8
   BOM pins (exactly-once file-level prefix, non-ASCII verbatim export,
-  BOM × guard composition) — session-38), and the secrets-hygiene
-  doc-surface pin (`tests/secrets.test.ts`, 3 cases: no 64-hex runs,
-  AUTH_SECRET empty-or-marker only, ADMIN_PASSWORD placeholders only —
-  session-40 A1, the pasted-live-key regression guard).
+  BOM × guard composition) — session-38), the secrets-hygiene
+  doc-surface pin (`tests/secrets.test.ts`, 4 cases: no 64-hex runs,
+  AUTH_SECRET empty-or-marker only, ADMIN_PASSWORD placeholders only,
+  no private-key blocks or GitHub token prefixes — session-40 A1, the
+  pasted-live-key regression guard; key-block class session-42), and
+  the BAKED_ORIGIN derivation seam (`tests/baked-origin.test.ts`, 25
+  cases: the documented `.env` formats + the dotenv-16.3.1 divergence
+  classes — export prefix, leading whitespace, colon separator, inline
+  comments, backtick quotes, last-wins duplicates, empty-value
+  fail-loud, ambient-empty precedence — session-42, the 22nd audit's
+  L1; the seam `tests/helpers/baked-origin.ts` is the exact grammar
+  `next build` parses with, unit-pinned so the e2e suite stays green
+  under ANY `.env` line shape).
 - **E2E (Playwright):** eight spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
@@ -292,7 +303,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  169/169 unit, build OK, 63/63 e2e).
+  195/195 unit, build OK, 63/63 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

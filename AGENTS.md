@@ -139,9 +139,13 @@ inline in components.
     `BAKED_ORIGIN` constant was once hardcoded to the dev default and
     broke (5 failures) against a production-baked build; it is now
     DERIVED from the same sources the build resolves with the same
-    precedence (ambient `NEXT_PUBLIC_SITE_URL` → repo `.env` parse →
-    the `siteUrl()` dev default) — keep that derivation intact or the
-    suite silently re-couples to one `.env` config. The `noindex` staff
+    precedence — the derivation is the unit-tested
+    dotenv-16.3.1-verbatim seam `tests/helpers/baked-origin.ts` (the
+    EXACT grammar `@next/env` bundles: `export ` prefixes, leading
+    whitespace, `:` separators, all three quote forms, inline comments,
+    last-wins duplicates; ambient-empty mirrors `??` — a broken config
+    fails the pins loudly) — keep that seam intact or the suite silently
+    re-couples to a subset of `.env` formats. The `noindex` staff
     pages inherit the root OG AND the root canonical (bare origin) via
     metadata merging — inert under noindex, recorded in ADR-011's
     Consequences.
@@ -232,10 +236,13 @@ inline in components.
   the form (`page.locator("form").getByRole("alert")`).
 - The login happy-path never asserts the in-flight "Signing in…" label —
   same fast-local-API race as the appointment form.
-- **Doc surfaces are secrets-scanned by a unit pin (session-40 A1):**
+- **Doc surfaces are secrets-scanned by a unit pin (session-40 A1,
+  extended session-42):**
   `tests/secrets.test.ts` fails if any repo-root `*.md`/`*.txt`, `docs/`
   tree file, or `.env.example` contains a 64-hex-char run, a non-empty
-  `AUTH_SECRET=`, or a non-placeholder `ADMIN_PASSWORD=` (code/test files
-  are deliberately unscanned — crypto vectors live there). Never paste a
-  live `.env` into a tracked doc; a doc that legitimately needs a hex
-  literal must be allowlisted in the test with a written reason.
+  `AUTH_SECRET=`, a non-placeholder `ADMIN_PASSWORD=`, a
+  `-----BEGIN … PRIVATE KEY-----` block, or a `ghp_`/`github_pat_`
+  token prefix (code/test files are deliberately unscanned — crypto
+  vectors live there). Never paste a live `.env` or an SSH key into a
+  tracked doc; a doc that legitimately needs a hex literal must be
+  allowlisted in the test with a written reason.

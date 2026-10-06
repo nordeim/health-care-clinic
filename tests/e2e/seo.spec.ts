@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+
+import { bakedOrigin } from "../helpers/baked-origin";
 
 // SEO surfaces (session-32, ADR-011) — the served contract for the
 // discoverability layer: robots.txt, sitemap.xml, canonical/OG/twitter
@@ -15,33 +15,15 @@ import { expect, test } from "@playwright/test";
 // host-rewrites the baked origin to the test base URL before requesting
 // (never fetch the baked origin itself).
 //
-// DERIVATION CONTRACT (session-40, the session-34 A4 coupling closed): the
-// build resolves the baked origin as ambient NEXT_PUBLIC_SITE_URL → the
-// repo .env value → http://localhost:3000 (the siteUrl() fallback in
-// src/lib/seo.ts). This spec derives BAKED_ORIGIN from the SAME sources
-// with the SAME precedence so the suite stays green under ANY .env
-// configuration — the dev default AND a production origin. Source 1:
-// process.env.NEXT_PUBLIC_SITE_URL (bun-run loads the repo .env into the
-// Playwright process, and ambient env beats .env — identical to what
-// `next build` resolves; the playwright.config AUTH_SECRET comment
-// documents the same bun-run behavior). Source 2: a direct parse of
-// <repo-root>/.env for the `npx playwright test` path (anchored on
-// process.cwd() per the documented global-setup.ts precedent — Playwright
-// transpiles specs through its CJS loader, so import.meta is unavailable).
-// Source 3: the seo.ts dev-default fallback.
-
-function bakedOrigin(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL;
-  if (fromEnv) return fromEnv;
-  try {
-    const envText = readFileSync(join(process.cwd(), ".env"), "utf8");
-    const match = envText.match(/^NEXT_PUBLIC_SITE_URL=["']?([^"'\r\n]+?)["']?\s*$/m);
-    if (match?.[1]) return match[1];
-  } catch {
-    // No .env (e.g. CI with env vars only) — fall through to the default.
-  }
-  return "http://localhost:3000";
-}
+// DERIVATION CONTRACT (session-40, the session-34 A4 coupling closed;
+// hardened session-42): the build resolves the baked origin as ambient
+// NEXT_PUBLIC_SITE_URL → the repo .env value → http://localhost:3000
+// (the siteUrl() fallback in src/lib/seo.ts). BAKED_ORIGIN is derived
+// from the SAME sources with the SAME precedence by the unit-tested
+// seam tests/helpers/baked-origin.ts — a dotenv-16.3.1-verbatim
+// single-key parse (the exact grammar @next/env bundles), so the suite
+// stays green under ANY .env line shape, not just the two documented
+// formats.
 
 const BAKED_ORIGIN = bakedOrigin();
 

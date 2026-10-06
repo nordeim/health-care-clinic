@@ -65,8 +65,22 @@ standalone trace rely on.
   DATABASE_URL="file:/srv/clinic/custom.db" bun .next/standalone/server.js
   ```
 
+  Nuance (session-42): a RELATIVE `DATABASE_URL` (e.g. the repo default
+  `"file:../db/custom.db"`) also works in production AS LONG AS the
+  server starts from the repo root (§2's rule — the documented operator
+  deployment does exactly this). The ABSOLUTE form remains the
+  recommendation for any copy that moves the artifact out of the repo
+  layout.
+
 - Initialize the schema before the first start:
   `DATABASE_URL=<prod url> bun run db:push`.
+- **A fresh-DB rebuild is a DATA-LOSS operation (session-42):**
+  `rm -rf db` followed by `db:push` + `db:seed` recreates an EMPTY
+  database — every appointment row and the staff account hash are
+  gone (a documented operator redeploy did exactly this, wiping the
+  live request history). To refresh the SCHEMA without losing data,
+  run `db:push` alone (Prisma applies additive changes in place); the
+  destroy-and-reseed sequence is only for disposable environments.
 - Seed the staff login before the first start (scrypt-hashed, upserted —
   re-run to rotate the password):
 

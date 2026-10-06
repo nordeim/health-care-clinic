@@ -15,6 +15,13 @@ import { describe, expect, it } from "vitest";
 //       "" placeholder or an explicit <...> redaction/placeholder marker,
 //   (c) non-placeholder ADMIN_PASSWORD assignments — placeholders are
 //       change-me, empty, the escaped $-form, or a <...> marker form.
+//   (d) private-key blocks and GitHub token prefixes (session-42, the
+//       22nd audit's L4) — a pasted `-----BEGIN … PRIVATE KEY-----` PEM/
+//       OpenSSH block or a `ghp_…`/`github_pat_…` token is the most
+//       plausible NEXT paste class given the operator's log-paste
+//       workflow and the SSH-push runbook context. RED-proven with a
+//       planted fixture (the tree was clean; the technique is recorded
+//       in docs/session_42.md).
 // Code and test files are deliberately NOT scanned: crypto vectors are
 // legitimate there (tests/auth.test.ts hashes by design). The remediation
 // for A1 was redaction + an operator rotation advisory; this test is the
@@ -47,6 +54,10 @@ function collectDocFiles(): string[] {
 
 const HEX_RUN = /[0-9a-fA-F]{64,}/g;
 const ASSIGNMENT = /\b(AUTH_SECRET|ADMIN_PASSWORD)\s*=\s*("[^"\r\n]*"|'[^'\r\n]*'|\S+)/g;
+// Key material that is not a 64-hex run: PEM/OpenSSH private-key headers
+// (any algorithm) and GitHub token prefixes (classic + fine-grained PATs).
+const KEY_MATERIAL =
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9]{20,}/;
 
 function stripQuotes(value: string): string {
   return value.replace(/^["']|["']$/g, "");
@@ -112,5 +123,18 @@ describe("secrets hygiene (doc surfaces)", () => {
       }
     }
     expect(offenders, `non-placeholder ADMIN_PASSWORD found:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("no private-key blocks or GitHub token prefixes in doc surfaces (the pasted-credential class)", () => {
+    const offenders = collectDocFiles()
+      .map((file) => {
+        const rel = path.relative(REPO_ROOT, file);
+        const text = readFileSync(file, "utf8");
+        const hits = text.match(KEY_MATERIAL) ?? [];
+        return { file: rel, hits };
+      })
+      .filter(({ hits }) => hits.length > 0)
+      .map(({ file, hits }) => `${file}: ${hits.join(", ")}`);
+    expect(offenders, `pasted key material found:\n${offenders.join("\n")}`).toEqual([]);
   });
 });
