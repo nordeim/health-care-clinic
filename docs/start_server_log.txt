@@ -39,18 +39,20 @@ $ ls -l db/
 total 28
 -rw-r--r-- 1 pete pete 28672 Oct  6 18:28 custom.db
 
+$ rm -rf .next/
+
 $ bun run build
 $ env -u DATABASE_URL next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/
 ▲ Next.js 16.3.8 (Turbopack)
 - Environments: .env
-✓ Running next.config.ts took 33ms
+✓ Running next.config.ts took 30ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 19.6s
-✓ Finished TypeScript in 4.9s
-✓ Collecting page data using 3 workers in 1029ms
-✓ Generating static pages using 3 workers (14/14) in 318ms
-✓ Finalizing page optimization in 3.8s
+✓ Compiled successfully in 9.4s
+✓ Finished TypeScript in 4.9s    
+✓ Collecting page data using 3 workers in 691ms    
+✓ Generating static pages using 3 workers (14/14) in 307ms
+✓ Finalizing page optimization in 3.3s    
 
 Route (app)
 ┌ ○ /
