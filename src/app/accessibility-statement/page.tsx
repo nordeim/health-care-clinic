@@ -1,11 +1,14 @@
-import type { Metadata } from "next";
 import { LegalPage } from "@/components/site/legal-page";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Accessibility Statement — Green Grove Family Clinic",
+// Title is BARE — the root layout's title.template composes the
+// "— Green Grove Family Clinic" suffix exactly once (session-32 F5).
+export const metadata = pageMetadata({
+  title: "Accessibility Statement",
   description:
     "Green Grove Family Clinic's commitment to an accessible website, and how to report a barrier.",
-};
+  path: "/accessibility-statement",
+});
 
 export default function AccessibilityStatementPage() {
   return (

@@ -36,7 +36,7 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 4. **IMPLEMENT** — One component per section; copy centralized; server
    components unless interaction demands a client island.
 5. **VERIFY** — Gate: `bun run lint && bun run typecheck && bun run test &&
-   bun run build`, then Playwright e2e (44 tests) plus in-browser
+   bun run build`, then Playwright e2e (53 tests) plus in-browser
    interaction checks at desktop and mobile widths.
 6. **DOCUMENT** — Engine-variance findings go into
    `docs/Tailwind-V4-Validation-Report.md` (trap log) and ADRs in
@@ -55,7 +55,8 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 
 ### File Organization
 
-- `src/app/` — routes, API handlers, `globals.css` (the design system)
+- `src/app/` — routes, API handlers, `globals.css` (the design system);
+  `sitemap.ts` + `robots.ts` (the SEO discoverability routes — ADR-011)
 - `src/app/login/`, `src/app/dashboard/` — staff surfaces (not linked from
   the landing page; session-guarded)
 - `src/components/site/` — one component per landing section + `Reveal`
@@ -66,7 +67,9 @@ reference has no login — its route table is `/`, `/privacy-policy`,
   (scrypt + HMAC session primitives), `validation.ts` (appointment + status
   seams), `rate-limit.ts` (XFF keying, limiter, body cap), `motion.ts`
   (reduced-motion scroll behavior), `db.ts`, `db-path.ts`, `seed-demo.ts`
-  (opt-in demo-row builder, session-28 F1)
+  (opt-in demo-row builder, session-28 F1), `seo.ts` (metadata composition
+  seam — brand, title template, OG image contract, PUBLIC_PATHS sitemap
+  allowlist, pageMetadata factory; session-32 ADR-011)
 - `prisma/` — schema (Appointment + AdminUser models)
 - `scripts/seed.ts` — `db:seed` staff account upsert (+ opt-in
   `SEED_DEMO=1`/`--demo` mode restoring the 6 demo dashboard rows)
@@ -151,8 +154,12 @@ non-obvious-rules list; this file holds the reasoning.
   (`tests/seed-demo.test.ts`, 8 cases: the 6-row contract, the 2/2/2
   status split, specialty/status allowlist membership, self-renewing
   date derivation, purity, cross-seam validity through
-  validateAppointmentPayload, field bounds — session-28 F1).
-- **E2E (Playwright):** six spec files — `mobile-navigation` (the
+  validateAppointmentPayload, field bounds — session-28 F1), and the SEO
+  composition seam (`tests/seo.test.ts`, 14 cases: the brand/template
+  constants, the ≤160-char SERP description bound, the PUBLIC_PATHS
+  allowlist (never the noindex routes), canonical/OG/twitter composition,
+  the OG image dimension contract, the bare-title rule — session-32).
+- **E2E (Playwright):** seven spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
   reduced-motion instant-jump pin, baseline security-header pin, the
@@ -163,7 +170,11 @@ non-obvious-rules list; this file holds the reasoning.
   dashboard guard, logout, full public-form→dashboard loop, enumeration
   parity, non-object body tolerance, login email-length bound), and
   `appointments-status` (the dashboard New→Confirmed→Completed loop via
-  the real UI + PATCH guard/validation/404 pins). Single
+  the real UI + PATCH guard/validation/404 pins), and `seo` (robots.txt
+  allow-all + the absent Disallow, sitemap loc parity — every advertised
+  loc fetches 200 after the LL-11 host rewrite, canonical/OG/twitter head
+  tags on the public pages, the og-image 1200×630 IHDR pin, the staff
+  noindex metas — session-32). Single
   worker, shared scratch DB (`db/e2e.db`), standalone server on :3100;
   EVERY request-level spec derives its spoofed XFF key per run
   (module constants with spec-unique third octets), AND every
@@ -254,7 +265,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  107/107 unit, build OK, 44/44 e2e).
+  121/121 unit, build OK, 53/53 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

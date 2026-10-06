@@ -20,7 +20,9 @@ import { StatusButton } from "@/components/dashboard/status-button";
  * this file only orchestrates. */
 
 export const metadata: Metadata = {
-  title: "Appointments — Green Grove Family Clinic",
+  // BARE title — the root layout's title.template composes the brand
+  // suffix exactly once (session-32 F5).
+  title: "Appointments",
   description: "Staff dashboard for appointment requests.",
   robots: { index: false, follow: false },
 };

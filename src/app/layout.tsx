@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans } from "next/font/google";
+import {
+  ROOT_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE_TEMPLATE,
+  pageMetadata,
+  siteUrl,
+} from "@/lib/seo";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -9,17 +16,26 @@ const dmSans = DM_Sans({
   variable: "--font-dm-sans",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+/* Root metadata (session-32, ADR-011): the public composition derives from
+ * the SEO seam (single source — src/lib/seo.ts, unit-tested). The root
+ * adds what only it can provide: metadataBase, the title DEFAULT (the
+ * landing page has no page-level metadata) and the TEMPLATE that suffixes
+ * every sub-page title exactly once, the keywords, and index/follow.
+ * applicationName matches the brand (audit F9 — was the repo name). */
+const publicMetadata = pageMetadata({
+  title: SITE_NAME,
+  description: ROOT_DESCRIPTION,
+  path: "/",
+});
 
 export const metadata: Metadata = {
-  // metadataBase turns relative OG/metadata URLs absolute against the
-  // canonical public origin documented in .env.example (NEXT_PUBLIC_SITE_URL
-  // — previously declared but never read).
-  metadataBase: new URL(siteUrl),
-  title: "Green Grove Family Clinic",
-  description:
-    "Compassionate, whole-person primary care for every generation — chronic care, women's health, pediatrics, vaccinations, laboratory services, and same-day appointments.",
-  applicationName: "Health Care Clinic",
+  ...publicMetadata,
+  metadataBase: new URL(siteUrl()),
+  title: {
+    default: SITE_NAME,
+    template: SITE_TITLE_TEMPLATE,
+  },
+  applicationName: SITE_NAME,
   keywords: [
     "family clinic",
     "primary care",
@@ -28,12 +44,6 @@ export const metadata: Metadata = {
     "vaccinations",
     "preventive care",
   ],
-  openGraph: {
-    title: "Green Grove Family Clinic",
-    description:
-      "Compassionate care that listens, explains, and supports you through every stage of life.",
-    type: "website",
-  },
   robots: { index: true, follow: true },
 };
 

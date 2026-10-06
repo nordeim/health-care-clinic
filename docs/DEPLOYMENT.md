@@ -90,7 +90,7 @@ standalone trace rely on.
 | `AUTH_SECRET` | **yes (production)** | HMAC key for staff session cookies — `openssl rand -hex 32`; signing throws without it |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | seed-time | Consumed by `bun run db:seed` only (escape a leading `$` as `\$`) |
 | `PORT` / `HOSTNAME` | no | Standalone server bind (default 3000 / localhost) |
-| `NEXT_PUBLIC_SITE_URL` | optional | Canonical origin for metadata |
+| `NEXT_PUBLIC_SITE_URL` | **recommended (production)** | Canonical origin — canonical/OG/sitemap URLs are BAKED at build time from it; unset means localhost appears in those tags (ADR-011). Set it BEFORE `bun run build`, e.g. `https://clinic.example` |
 
 ## 5. Health check
 

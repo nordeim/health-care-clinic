@@ -43,12 +43,13 @@ geometry).
 | 📱 Mobile menu | Accessible dropdown panel (`aria-expanded`, Escape, outside-click, link-activation closes + jumps) pinned by e2e specs |
 | 🩺 Eight services | Stacked-entrance cards choreographed by IntersectionObserver + CSS custom properties |
 | 📝 Appointment form | Underline-style form → validated `POST /api/appointments` → Prisma/SQLite, with Sending…/success/error states |
+| 🔎 SEO discoverability | Beyond-parity head-only layer (ADR-011): `/sitemap.xml` (the 3 public routes, derived from the unit-tested `src/lib/seo.ts` allowlist) + allow-all `/robots.txt` with the sitemap reference, canonical URLs, complete OpenGraph (incl. a generated 1200×630 `og-image.png`) and a `summary_large_image` twitter card — every public page title composed by a single root template. The reference SPA has none of this (verified: both files 404, no meta description) — the enhancement adds zero rendered-body markup, so visual parity is untouched |
 | ❓ FAQ accordion | Native `<details>`/`<summary>` with rotating plus glyphs |
 | ⚖️ Legal pages | `/privacy-policy` and `/accessibility-statement` with identical copy and layout |
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
 | 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests with status transitions (New → Confirmed → Completed via `PATCH /api/appointments/[id]`), server-guarded |
 | 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), strict server-side payload validation, and baseline security headers on every route response and app-level redirect (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, no `X-Powered-By`; the framework's internal 308 trailing-slash redirect is emitted before `headers()` applies — a documented, e2e-pinned limitation) |
-| ✅ Tested | 107 unit tests + 44 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), and the validation + timing-equalization + status + demo-seed seams |
+| ✅ Tested | 121 unit tests + 53 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), the SEO surface pins (robots allow-all + no-Disallow, sitemap loc parity — every advertised loc fetches 200, canonical/OG/twitter head tags, og-image 1200×630 IHDR pin, the staff noindex metas), and the validation + timing-equalization + status + demo-seed + seo-composition seams |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified
@@ -95,6 +96,8 @@ flowchart TB
 │   ├── 📄 globals.css            ← Tailwind v4 theme: full hsl() tokens, pinned shadows, base element rules
 │   ├── 📄 layout.tsx             ← DM Sans via next/font, metadata, viewport
 │   ├── 📄 icon.svg               ← the reference's SVG favicon (vendored)
+│   ├── 📄 sitemap.ts              ← /sitemap.xml — the 3 public routes (PUBLIC_PATHS-derived)
+│   ├── 📄 robots.ts               ← /robots.txt — allow-all + sitemap reference (ADR-011)
 │   ├── 📄 page.tsx               ← Landing composition (8 scroll sections + fixed header + footer)
 │   ├── 📂 api/appointments/      ← POST — validated writes; [id]/ PATCH — staff status transitions
 │   ├── 📂 api/auth/              ← POST login/logout — scrypt verify + session cookie
@@ -115,14 +118,19 @@ flowchart TB
     ├── 📄 motion.ts              ← Reduced-motion-aware scroll behavior
     ├── 📄 db.ts                  ← Prisma singleton (env-resolved URL)
     ├── 📄 db-path.ts             ← SQLite path resolution (unit-tested)
-    └── 📄 seed-demo.ts            ← Demo dashboard rows (opt-in, unit-tested — session-28 F1)
+    ├── 📄 seed-demo.ts            ← Demo dashboard rows (opt-in, unit-tested — session-28 F1)
+    └── 📄 seo.ts                  ← Metadata composition seam: brand, title template, OG image
+    │                                 contract, PUBLIC_PATHS allowlist, pageMetadata factory
+    │                                 (unit-tested — session-32, ADR-011)
 📂 prisma/schema.prisma           ← Appointment + AdminUser models
 📂 scripts/seed.ts                ← db:seed — staff account upsert; SEED_DEMO=1/--demo restores the 6 demo rows (opt-in, idempotent)
 📂 tests/e2e/                     ← Playwright specs (mobile-navigation, landing,
-│                                   appointment-form, appointments-status, legal-pages, auth)
+│                                   appointment-form, appointments-status, legal-pages, auth,
+│                                   seo — robots/sitemap/canonical/OG/og-image/noindex pins)
 📂 tests/*.test.ts                ← Vitest seams (db-path, auth, deps, validation,
-│                                   rate-limit, status, seed-demo)
+│                                   rate-limit, status, seed-demo, seo)
 📂 public/media/                  ← Hero video/poster, section photography
+📂 public/og-image.png            ← Generated 1200×630 social card (session-32)
 📂 docs/                          ← Validation report, screenshots, deployment
 ```
 
@@ -171,7 +179,9 @@ starting with `$` must be escaped as `\$`).
 
 ```bash
 DATABASE_URL="file:../db/custom.db"   # relative to prisma/schema.prisma
-NEXT_PUBLIC_SITE_URL=http://localhost:3000   # canonical origin for metadata
+NEXT_PUBLIC_SITE_URL=http://localhost:3000   # canonical origin — canonical/OG/sitemap URLs
+                                      # resolve against it at BUILD time; set it in production
+                                      # or those tags advertise localhost (ADR-011)
 AUTH_SECRET=""                        # HMAC key for staff sessions (REQUIRED in production)
 ADMIN_EMAIL="admin@example.com"       # seeded by bun run db:seed
 ADMIN_PASSWORD="change-me"            # seeded by bun run db:seed (escape $ as \$)
@@ -195,7 +205,11 @@ bun run test:e2e      # Playwright — boots the standalone server + scratch DB
 The e2e layer deserves a note: `tests/e2e/mobile-navigation.spec.ts` pins
 the mobile menu contract AND guards the documented Tailwind v4 traps by
 rasterizing the rendered pixel of the nav pill and dropdown (a bare-HSL
-theme regression would collapse them to transparent).
+theme regression would collapse them to transparent). The
+`seo` spec pins the discoverability surfaces (robots allow-all + the
+absent Disallow, sitemap loc parity — every advertised `<loc>` fetches
+200 after the LL-11 host rewrite, canonical/OG/twitter head tags, the
+og-image 1200×630 IHDR dimensions, and the staff noindex metas).
 
 ## Design System
 

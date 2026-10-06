@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14, 16, 18, 20, 22, 24, 26, 28 and 30.
-version: 2.8.6
+  12, 14, 16, 18, 20, 22, 24, 26, 28, 30 and 32.
+version: 2.8.7
 last_updated: 2026-10-06
-project_state: 107 unit tests + 44 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); demo-seed closed at the root (session-28 F1: `SEED_DEMO=1 bun run db:seed` / `--demo` restores the 6 realistic dashboard rows — opt-in so production seeding never creates patient rows, idempotent (skip-if-exists by fullName — re-runs never duplicate or clobber real status transitions), self-renewing dates (now + offsetDays — the S26 F4 anti-erosion doctrine applied to seed data), specialties/statuses from the API's derived allowlists, every row a valid public-API payload by construction via the unit-tested src/lib/seed-demo.ts seam — the 4×-recurred workspace-reset seed-row class is dead); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past); doc-tree inventories complete (session-30 F1–F3: every file-tree listing across README/CLAUDE/SKILL §5 now covers all 8 lib files + all 7 unit seams + the demo-mode seed note — the missed-sibling inventory class swept)
+project_state: 121 unit tests + 53 e2e tests green; SEO discoverability layer live (session-32, ADR-011: /sitemap.xml + allow-all /robots.txt + canonical/OG/twitter head tags + generated 1200×630 og-image.png, all composed from the unit-tested src/lib/seo.ts seam — PUBLIC_PATHS-derived sitemap, root title.template so sub-pages pass BARE titles, robots.txt deliberately has NO Disallow so the staff pages' noindex metas stay crawler-visible, everything head-only so rendered parity is untouched; e2e seo spec pins robots allow-all + absent Disallow, sitemap loc parity with the LL-11 host rewrite, canonical/OG/twitter tags, the og-image IHDR dimensions and the staff noindex metas; NEXT_PUBLIC_SITE_URL is baked at BUILD time — set it in production or the tags advertise localhost); appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); demo-seed closed at the root (session-28 F1: `SEED_DEMO=1 bun run db:seed` / `--demo` restores the 6 realistic dashboard rows — opt-in so production seeding never creates patient rows, idempotent (skip-if-exists by fullName — re-runs never duplicate or clobber real status transitions), self-renewing dates (now + offsetDays — the S26 F4 anti-erosion doctrine applied to seed data), specialties/statuses from the API's derived allowlists, every row a valid public-API payload by construction via the unit-tested src/lib/seed-demo.ts seam — the 4×-recurred workspace-reset seed-row class is dead); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past); doc-tree inventories complete (session-30 F1–F3: every file-tree listing across README/CLAUDE/SKILL §5 now covers all lib files + all unit seams + the demo-mode seed note — the missed-sibling inventory class swept)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -207,6 +207,11 @@ scripts/seed.ts              db:seed staff upsert (the ONLY script — the
                              demo dashboard rows (session-28 F1)
 src/lib/seed-demo.ts          demo-row builder seam (pure, unit-tested —
                              self-renewing dates, derived specialties)
+src/lib/seo.ts               metadata composition seam: brand, title template,
+                             OG image contract, PUBLIC_PATHS sitemap allowlist,
+                             pageMetadata factory (pure, unit-tested — S32)
+src/app/sitemap.ts           /sitemap.xml — the 3 public routes (S32, ADR-011)
+src/app/robots.ts            /robots.txt — allow-all + sitemap ref (S32, ADR-011)
 ```
 
 **Client-island discipline:** Server Components by default; `"use client"`
@@ -356,12 +361,13 @@ API calls surface there. API failures log structured messages
 ```bash
 bun run lint          # 0 errors
 bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
-bun run test          # 107/107 (db-path 19 + auth 19 + deps 4 +
+bun run test          # 121/121 (db-path 19 + auth 19 + deps 4 +
                       #  validation 27 + rate-limit 20 + status 10 +
-                      #  seed-demo 8)
+                      #  seed-demo 8 + seo 14)
 bun run build         # OK; routes: / /login /privacy-policy /
-                      # accessibility-statement static; /api/* /dashboard dynamic
-bun run test:e2e      # 44/44 (6 spec files)
+                      # accessibility-statement /robots.txt /sitemap.xml
+                      # static; /api/* /dashboard dynamic
+bun run test:e2e      # 53/53 (7 spec files)
 ```
 
 Manual smoke: mobile menu open → link click (closes + jumps) → Escape
@@ -998,3 +1004,36 @@ purged after); e2e.db at 45 rows = 5 runs × 9 (the documented
 accumulation, arithmetically perfect — living docs keep the open-ended
 "rows accumulate" wording per the S26 F6 families doctrine). SKILL.md →
 v2.8.6.
+
+### [S32] Session 32 — SEO discoverability layer (ADR-011), 17th audit, parity re-verification
+
+Workspace re-cloned (reset again — the documented reset class; re-bootstrap:
+generated credentials, db:push + db:seed + SEED_DEMO → exactly 6 demo rows,
+the ambient DATABASE_URL hijack ACTIVE all session with every write landing
+in the repo DB). 17th fresh-eyes audit (Task 32-a, every finding
+orchestrator-re-verified): zero code bugs; the entire finding set is the
+SEO class the operator raised — no sitemap/robots (reference 404s both
+too), zero canonicals, incomplete OG (no url/siteName/locale/images, no
+twitter card, no og-image asset), root description 167 > 160 SERP bound,
+no title.template, NEXT_PUBLIC_SITE_URL documented merely "optional",
+applicationName naming mismatch, PAD §10 missing the SEO row. All fixed
+TDD-first: RED tests/seo.test.ts (14 cases) before src/lib/seo.ts (the
+pure metadata seam: brand/template/OG-image/PUBLIC_PATHS constants,
+siteUrl(), ogTitleFor(), pageMetadata()); atomic title.template landing
+(proved by the UNCHANGED legal-pages title pins — 16/16); RED
+tests/e2e/seo.spec.ts (9 tests: robots allow-all + absent Disallow, both
+sitemap 404s first, loc parity via the LL-11 host rewrite, canonical/
+OG/twitter head tags, og-image 1200×630 IHDR pin, staff noindex metas)
+before sitemap.ts + robots.ts + the generated og-image.png (Playwright
+render, on-brand tokens, generator lives OUTSIDE the repo — deps
+contract). Considered and skipped: JSON-LD (placeholder NAP — dishonest),
+manifest (reference has none), robots Disallow of the staff routes (would
+hide their noindex metas). Unit 107 → 121; e2e 44 → 53 (× 2 double-run);
+build 12 → 14 routes (robots.txt + sitemap.xml static). Live re-verified:
+7490px, panel 192×148 @ (178,80), link-click 0.421875/1837, rasterized
+[38,74,57,230] exact, 12-step product loop green, dev.log clean. 20
+screenshots refreshed (03-desktop-full exactly 1440×7490; capture row
+purged, 6 seed rows retained; 05-mobile-menu-open grid-sampled 24/24
+green-dominant). Docs swept: README/AGENTS/CLAUDE/SKILL §5 + §11 + counts,
+PAD ADR-011 + [S32] + §3.2/§7/§8.2/§10/§11, DEPLOYMENT + .env.example
+NEXT_PUBLIC_SITE_URL notes. SKILL.md → v2.8.7.

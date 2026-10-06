@@ -17,7 +17,7 @@ the log tails, never by the wrapper's exit status.
 | Lint | `bun run lint` (14 correctness rules ON; every off documented in the config — session-12 F3, session-16 F3) |
 | Typecheck | `bun run typecheck` |
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
-| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 44 tests) |
+| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 53 tests) |
 | DB schema | `bun run db:push` (Prisma; SQLite at `db/custom.db`) |
 | Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) — add `SEED_DEMO=1` (or `-- --demo`) to ALSO restore the 6 demo dashboard rows (opt-in, idempotent, dev-only; default seeding never creates patient rows — session-28 F1) |
 | Production | `bun run build && bun .next/standalone/server.js` |
@@ -46,8 +46,12 @@ The reference itself has NO login or dashboard
 (its route table is `/`, `/privacy-policy`, `/accessibility-statement`);
 the staff `/login` + `/dashboard` pair is a documented extension beyond
 parity — kept UNLINKED from the landing page so the public experience
-stays byte-faithful. All marketing copy lives in
-`src/lib/content.ts` — change it there, never inline in components.
+stays byte-faithful. An SEO discoverability layer (`/sitemap.xml`,
+`/robots.txt`, canonical/OG/twitter head tags, `og-image.png` — ADR-011,
+`src/lib/seo.ts`) is a second head-only beyond-parity extension: the
+reference has none of it, and it adds zero rendered-body markup. All
+marketing copy lives in `src/lib/content.ts` — change it there, never
+inline in components.
 
 ## Non-obvious rules (the parts agents get wrong)
 
@@ -120,6 +124,16 @@ stays byte-faithful. All marketing copy lives in
     F1): a realistic-looking example string gets adopted as the real
     credential by fresh bootstraps — which re-leaks it once docs are
     pushed.
+11. **SEO surfaces are build-time-baked (ADR-011):** `/sitemap.xml`,
+    `/robots.txt`, canonical/OG absolute URLs resolve against
+    `NEXT_PUBLIC_SITE_URL` **at build time** — the e2e seo spec
+    host-rewrites the baked origin to the test base URL before fetching
+    (the LL-11 lesson; never fetch the baked origin). robots.txt is
+    ALLOW-ALL by decision (the staff pages' noindex METAS must stay
+    crawler-visible — a robots.txt Disallow would hide them); the spec
+    pins the absent Disallow. Page titles are composed by the root
+    `title.template` — sub-pages pass BARE titles (a hand-written suffix
+    would double).
 
 ## Conventions
 

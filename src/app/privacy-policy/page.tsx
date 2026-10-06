@@ -1,11 +1,14 @@
-import type { Metadata } from "next";
 import { LegalPage } from "@/components/site/legal-page";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy — Green Grove Family Clinic",
+// Title is BARE — the root layout's title.template composes the
+// "— Green Grove Family Clinic" suffix exactly once (session-32 F5).
+export const metadata = pageMetadata({
+  title: "Privacy Policy",
   description:
     "How Green Grove Family Clinic collects, uses, and retains information submitted through this website.",
-};
+  path: "/privacy-policy",
+});
 
 export default function PrivacyPolicyPage() {
   return (

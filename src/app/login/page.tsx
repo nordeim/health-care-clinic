@@ -9,7 +9,10 @@ import { LoginForm } from "@/components/dashboard/login-form";
  * search engines. */
 
 export const metadata: Metadata = {
-  title: "Staff sign in — Green Grove Family Clinic",
+  // BARE title — the root layout's title.template composes the brand
+  // suffix exactly once (session-32 F5). noindex keeps the admin surface
+  // out of search engines (and the sitemap/robots seam never lists it).
+  title: "Staff sign in",
   description: "Staff access to the Green Grove appointment dashboard.",
   robots: { index: false, follow: false },
 };
