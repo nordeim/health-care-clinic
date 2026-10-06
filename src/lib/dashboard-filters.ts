@@ -77,6 +77,24 @@ export function filtersAreEmpty(filters: DashboardFilters): boolean {
   return filters.status === undefined && filters.specialty === undefined && filters.search === undefined;
 }
 
+/** Convert a URLSearchParams bag into the raw record shape
+ * `parseDashboardFilters` accepts — EVERY occurrence per key, in order
+ * (session-36, F5). The export route previously collapsed repeated keys via
+ * `Object.fromEntries` (LAST value wins) while the dashboard page's Next
+ * searchParams path takes the FIRST — a hand-crafted
+ * `?status=new&status=completed` URL rendered "new" but exported
+ * "completed". Routing both surfaces through this conversion makes them
+ * first-wins BY CONSTRUCTION (firstValue takes index 0). */
+export function urlSearchParamsToRecord(
+  params: URLSearchParams,
+): Record<string, string[]> {
+  const record: Record<string, string[]> = {};
+  for (const [key, value] of params) {
+    (record[key] ??= []).push(value);
+  }
+  return record;
+}
+
 /** Pure AND filter: status exact, specialty exact, and a case-insensitive
  * substring search across the contact fields (name / phone / email). */
 export function filterAppointments(
@@ -108,10 +126,24 @@ const CSV_COLUMNS = [
   "Status",
 ] as const;
 
+/** Spreadsheet-formula guard (session-36, the OWASP CSV-injection class):
+ * a cell whose FIRST character could start a formula (= + - @ tab CR) is
+ * prefixed with an apostrophe. The big-three spreadsheet apps treat a
+ * leading apostrophe as a text marker — hidden in display, so values like
+ * "+65 6555 0134" still DISPLAY verbatim while refusing evaluation. The
+ * public appointment form accepts formula-leading names/phones/emails
+ * (fullName has no charset rule; EMAIL_PATTERN accepts "=a@b.cd"), so the
+ * EXPORT is the evaluation boundary and guards every column uniformly. */
+const FORMULA_LEADING = /^[=+\-@\t\r]/;
+
 /** Quote a field when it contains a comma, quote, CR, or LF; embedded
- * quotes are doubled (RFC 4180 §2.7). */
+ * quotes are doubled (RFC 4180 §2.7); formula-leading cells gain the
+ * apostrophe text-marker first (the guard composes INSIDE the quotes). */
 function csvField(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+  const safe = FORMULA_LEADING.test(value) && !value.startsWith("'")
+    ? `'${value}`
+    : value;
+  return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
 /** Compose the export: header row, ISO 8601 dates, raw status values (the

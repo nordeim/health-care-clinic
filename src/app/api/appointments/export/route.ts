@@ -6,6 +6,7 @@ import {
   appointmentsToCsv,
   filterAppointments,
   parseDashboardFilters,
+  urlSearchParamsToRecord,
 } from "@/lib/dashboard-filters";
 import { clientKey, createRateLimiter } from "@/lib/rate-limit";
 
@@ -63,8 +64,12 @@ export async function GET(request: Request) {
   }
 
   // The SAME seam the dashboard page uses — filters cannot drift apart.
+  // urlSearchParamsToRecord keeps EVERY occurrence per key so parse's
+  // firstValue resolves repeated keys FIRST-wins — byte-identical to the
+  // dashboard page's Next-searchParams path (session-36, F5: the export
+  // always matches the visible view, even for hand-crafted URLs).
   const url = new URL(request.url);
-  const filters = parseDashboardFilters(Object.fromEntries(url.searchParams));
+  const filters = parseDashboardFilters(urlSearchParamsToRecord(url.searchParams));
 
   const appointments = await db.appointment.findMany({
     orderBy: { createdAt: "desc" },

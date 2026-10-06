@@ -17,7 +17,7 @@ the log tails, never by the wrapper's exit status.
 | Lint | `bun run lint` (14 correctness rules ON; every off documented in the config — session-12 F3, session-16 F3) |
 | Typecheck | `bun run typecheck` |
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
-| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 61 tests) |
+| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 63 tests) |
 | DB schema | `bun run db:push` (Prisma; SQLite at `db/custom.db`) |
 | Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) — add `SEED_DEMO=1` (or `-- --demo`) to ALSO restore the 6 demo dashboard rows (opt-in, idempotent, dev-only; default seeding never creates patient rows — session-28 F1) |
 | Production | `bun run build && bun .next/standalone/server.js` |
@@ -141,6 +141,16 @@ inline in components.
     build env first. The `noindex` staff pages inherit the root OG AND
     the root canonical (bare origin) via metadata merging — inert under
     noindex, recorded in ADR-011's Consequences.
+12. **The CSV export carries a spreadsheet formula-injection guard**
+    (session-36, in `csvField` of `src/lib/dashboard-filters.ts`): cells
+    leading with `= + - @` tab CR gain the apostrophe text-marker
+    (OWASP CSV-injection neutralization — public-form names/phones/emails
+    are attacker-controllable, and the export is the evaluation boundary).
+    Never "fix" it back to raw values; the e2e formula-guard pin is
+    RED-proven. Duplicate filter keys parse FIRST-wins on BOTH the
+    dashboard page and the export route (the seam's
+    `urlSearchParamsToRecord` + `firstValue`) — keep the export route on
+    that conversion, never `Object.fromEntries` (last-wins).
 
 ## Conventions
 

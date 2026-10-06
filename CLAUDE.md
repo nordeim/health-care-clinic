@@ -36,7 +36,7 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 4. **IMPLEMENT** — One component per section; copy centralized; server
    components unless interaction demands a client island.
 5. **VERIFY** — Gate: `bun run lint && bun run typecheck && bun run test &&
-   bun run build`, then Playwright e2e (53 tests) plus in-browser
+   bun run build`, then Playwright e2e (63 tests) plus in-browser
    interaction checks at desktop and mobile widths.
 6. **DOCUMENT** — Engine-variance findings go into
    `docs/Tailwind-V4-Validation-Report.md` (trap log) and ADRs in
@@ -168,12 +168,14 @@ non-obvious-rules list; this file holds the reasoning.
   constants, the ≤160-char SERP description bound, the PUBLIC_PATHS
   allowlist (never the noindex routes), canonical/OG/twitter composition,
   the OG image dimension contract, the bare-title rule — session-32),
-  and the dashboard query seam (`tests/dashboard-filters.test.ts`, 31
+  and the dashboard query seam (`tests/dashboard-filters.test.ts`, 42
   cases: derived-allowlist parsing incl. empty GET-form controls and
   array shapes, AND filtering with case-insensitive search across
   name/phone/email, RFC 4180 CSV quoting with doubled embedded quotes +
   CRLF rows + null-field handling, the form-encoded query-string
-  round-trip — session-34, ADR-012).
+  round-trip — session-34, ADR-012; plus the OWASP spreadsheet
+  formula-injection guard cases and the `urlSearchParamsToRecord`
+  duplicate-key first-wins round-trip — session-36).
 - **E2E (Playwright):** eight spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
@@ -193,7 +195,8 @@ non-obvious-rules list; this file holds the reasoning.
   query layer: anonymous export 401, the derived select options,
   status-filter/search/case-insensitivity pins, bogus-param dropping,
   the empty-filter state, and the CSV export — filter-respecting,
-  RFC 4180 quoting, session-guarded — session-34). Single
+  RFC 4180 quoting, session-guarded — session-34; plus the formula-guard
+  pin and the duplicate-key first-wins pin — session-36). Single
   worker, shared scratch DB (`db/e2e.db`), standalone server on :3100;
   EVERY request-level spec derives its spoofed XFF key per run
   (module constants with spec-unique third octets), AND every
@@ -284,7 +287,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  152/152 unit, build OK, 61/61 e2e).
+  163/163 unit, build OK, 63/63 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

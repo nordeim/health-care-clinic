@@ -278,4 +278,84 @@ test.describe("dashboard query layer (filters + CSV export)", () => {
     // RFC 4180: the comma forces quoting, the embedded quotes double.
     expect(csv).toContain(`"Filters, E2E ""Gamma"" ${stamp}"`);
   });
+
+  test("export neutralizes spreadsheet-formula payloads (OWASP CSV injection, session-36)", async ({ page }) => {
+    await loginViaApi(page);
+    // Both payloads are VALID public-form submissions (fullName 3–120 with
+    // no charset rule; phone 7–32) — the export is the evaluation boundary.
+    // The name needs no per-run stamp: the assertion targets the EXACT
+    // guarded field, which is unique in the export by construction.
+    const submit = await page.request.post("/api/appointments", {
+      headers: { "X-Forwarded-For": fixtureKey(10) },
+      data: {
+        fullName: '=HYPERLINK("http://evil.example","Click") Injection E2E',
+        phone: "+65 6555 9898",
+        specialty: "Primary Care",
+      },
+    });
+    expect(submit.status()).toBe(201);
+
+    const response = await page.request.get("/api/appointments/export", {
+      headers: { "X-Forwarded-For": EXPORT_KEY },
+    });
+    expect(response.status()).toBe(200);
+    const csv = await response.text();
+    // The apostrophe text-marker lands INSIDE the RFC 4180 quoted field —
+    // spreadsheet apps display the value verbatim but refuse evaluation.
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil.example"",""Click"") Injection E2E"`);
+    // The +leading international phone gains the same marker.
+    expect(csv).toContain("'+65 6555 9898");
+    // No cell may START a formula unguarded (field-start forms: after a
+    // comma or a doubled closing quote, or at the line start).
+    for (const line of csv.split("\r\n").slice(1)) {
+      expect(line).not.toMatch(/(^|,)=HYPERLINK/);
+    }
+  });
+
+  test("duplicate filter keys parse FIRST-wins — the export matches the visible view (session-36, F5)", async ({ page }) => {
+    await loginViaApi(page);
+    const stamp = `${Date.now()}-${process.pid}`;
+    const key = fixtureKey(11);
+    const [alpha, beta] = await Promise.all([
+      page.request.post("/api/appointments", {
+        headers: { "X-Forwarded-For": key },
+        data: { fullName: `Dupkey E2E Alpha ${stamp}`, phone: "555-0179", specialty: "Primary Care" },
+      }),
+      page.request.post("/api/appointments", {
+        headers: { "X-Forwarded-For": key },
+        data: { fullName: `Dupkey E2E Beta ${stamp}`, phone: "555-0180", specialty: "Family care" },
+      }),
+    ]);
+    expect(alpha.status()).toBe(201);
+    expect(beta.status()).toBe(201);
+    const { id } = (await beta.json()) as { id: string };
+    const patched = await page.request.patch(`/api/appointments/${id}`, {
+      headers: { "X-Forwarded-For": key },
+      data: { status: "confirmed" },
+    });
+    expect(patched.status()).toBe(200);
+
+    // A hand-crafted URL repeating an allowlisted key: the dashboard page
+    // (Next searchParams → firstValue) shows status=new; the export MUST
+    // filter identically (first value), never the Object.fromEntries last.
+    const dashboard = await page.goto(
+      "/dashboard?status=new&status=confirmed",
+    );
+    expect(dashboard?.status()).toBe(200);
+    await expect(
+      page.getByRole("row", { name: new RegExp(`Dupkey E2E Alpha ${stamp}`) }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("row", { name: new RegExp(`Dupkey E2E Beta ${stamp}`) }),
+    ).toHaveCount(0);
+
+    const response = await page.request.get(
+      "/api/appointments/export?status=new&status=confirmed",
+      { headers: { "X-Forwarded-For": EXPORT_KEY } },
+    );
+    expect(response.status()).toBe(200);
+    const csv = await response.text();
+    expect(csv).toContain(`Dupkey E2E Alpha ${stamp}`);
+    expect(csv).not.toContain(`Dupkey E2E Beta ${stamp}`);
+  });
 });
