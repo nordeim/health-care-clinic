@@ -177,7 +177,10 @@ non-obvious-rules list; this file holds the reasoning.
   formula-injection guard cases and the `urlSearchParamsToRecord`
   duplicate-key first-wins round-trip — session-36; plus the UTF-8
   BOM pins (exactly-once file-level prefix, non-ASCII verbatim export,
-  BOM × guard composition) — session-38).
+  BOM × guard composition) — session-38), and the secrets-hygiene
+  doc-surface pin (`tests/secrets.test.ts`, 3 cases: no 64-hex runs,
+  AUTH_SECRET empty-or-marker only, ADMIN_PASSWORD placeholders only —
+  session-40 A1, the pasted-live-key regression guard).
 - **E2E (Playwright):** eight spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
@@ -289,7 +292,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  166/166 unit, build OK, 63/63 e2e).
+  169/169 unit, build OK, 63/63 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

@@ -135,12 +135,16 @@ inline in components.
     crawler-visible — a robots.txt Disallow would hide them); the spec
     pins the absent Disallow. Page titles are composed by the root
     `title.template` — sub-pages pass BARE titles (a hand-written suffix
-    would double). NOTE (session-34 A4): the spec's `BAKED_ORIGIN`
-    constant is coupled to the repo-`.env` build default — running e2e
-    against a production-baked artifact requires deriving it from the
-    build env first. The `noindex` staff pages inherit the root OG AND
-    the root canonical (bare origin) via metadata merging — inert under
-    noindex, recorded in ADR-011's Consequences.
+    would double). NOTE (session-34 A4, CLOSED session-40): the spec's
+    `BAKED_ORIGIN` constant was once hardcoded to the dev default and
+    broke (5 failures) against a production-baked build; it is now
+    DERIVED from the same sources the build resolves with the same
+    precedence (ambient `NEXT_PUBLIC_SITE_URL` → repo `.env` parse →
+    the `siteUrl()` dev default) — keep that derivation intact or the
+    suite silently re-couples to one `.env` config. The `noindex` staff
+    pages inherit the root OG AND the root canonical (bare origin) via
+    metadata merging — inert under noindex, recorded in ADR-011's
+    Consequences.
 12. **The CSV export carries a spreadsheet formula-injection guard**
     (session-36, in `csvField` of `src/lib/dashboard-filters.ts`): cells
     leading with `= + - @` tab CR gain the apostrophe text-marker
@@ -228,3 +232,10 @@ inline in components.
   the form (`page.locator("form").getByRole("alert")`).
 - The login happy-path never asserts the in-flight "Signing in…" label —
   same fast-local-API race as the appointment form.
+- **Doc surfaces are secrets-scanned by a unit pin (session-40 A1):**
+  `tests/secrets.test.ts` fails if any repo-root `*.md`/`*.txt`, `docs/`
+  tree file, or `.env.example` contains a 64-hex-char run, a non-empty
+  `AUTH_SECRET=`, or a non-placeholder `ADMIN_PASSWORD=` (code/test files
+  are deliberately unscanned — crypto vectors live there). Never paste a
+  live `.env` into a tracked doc; a doc that legitimately needs a hex
+  literal must be allowlisted in the test with a written reason.

@@ -33,6 +33,8 @@ server.log
 # database binaries — recreate with db:push + db:seed
 db/*.db
 db/*.db-journal
+db/*.db-wal
+db/*.db-shm
 
 # prisma generated client
 node_modules/

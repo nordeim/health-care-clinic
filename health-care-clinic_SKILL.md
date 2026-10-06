@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 and 38.
-version: 2.9.0
+  12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38 and 40.
+version: 2.9.1
 last_updated: 2026-10-06
-project_state: 166 unit tests + 63 e2e tests green; CSV export UTF-8 BOM live (session-38, the 20th audit's F3: `appointmentsToCsv` emitted no EF BB BF signature — Excel double-click decodes BOM-less UTF-8 CSV with the system ANSI codepage, so a valid non-ASCII public-form fullName like `José García` exported as mojibake in the dominant clinic-spreadsheet app; the fix is the industry-standard file-level signature — exactly once, before the header row, never per-row, transparent to LibreOffice/Sheets, composing with the per-cell formula guard; 3 new unit pins + 3 updated exact-output pins + the e2e header pin RED-proven by temporarily reverting the BOM); the dead `!value.startsWith("'")` conjunct dropped from csvField (session-38 F4 — provably unreachable, `'` is not in the formula class; the no-double-guard unit pin stays as the regex-drift guard); `db:generate` now carries the env -u guard (session-38 F6 — the `db:*` blanket claim in AGENTS rule 8 is now literally true); CSV formula-injection guard live (session-36, the 19th audit's first-ever Medium: public-form names/phones/emails are attacker-controllable and `csvField` only guarded RFC 4180 chars — a `=WEBSERVICE(...)` fullName exported raw would evaluate in a staff spreadsheet and exfiltrate adjacent patient PII; the OWASP neutralization landed in `csvField` of src/lib/dashboard-filters.ts — cells leading with `= + - @` tab CR gain the apostrophe text-marker INSIDE the quotes, uniform across every exported column, ordinary values byte-identical, `'+65 …` phones still display verbatim; 6 RED unit cases + an e2e pin RED-proven by temporarily reverting the guard); duplicate-key filter parsing unified FIRST-wins (session-36 F5: the export route's Object.fromEntries collapsed repeated keys LAST-wins while the dashboard page's Next-searchParams path is first-wins — the new seam export `urlSearchParamsToRecord` + `firstValue` makes both surfaces identical by construction, 5 unit pins + 1 e2e pin); dashboard query layer live (session-34, ADR-012: status/specialty filters + case-insensitive search + CSV export, ALL composed from the unit-tested src/lib/dashboard-filters.ts seam — derived-allowlist parsing (bogus params dropped, never a 500), AND filtering across name/phone/email, RFC 4180 CSV with quote-doubling + CRLF, form-encoded query strings; the dashboard drives it with a NATIVE GET FORM (zero client islands, works without JS) reading searchParams, stats stay global, filters scope the table within the latest-100 window; GET /api/appointments/export serves the CSV — session-guarded with the PATCH doctrine, 60/10-min limiter, the SAME seam so the export always matches the visible view; e2e pins anon-401/derived-selects/filter/search/casefold/bogus-dropping/empty-state/export-respects-filter/RFC 4180 escaping; per-TEST fixture keys 198.51.126.<pid>.<n> — the 5/10-min POST limiter would 429 a single shared key); SEO discoverability layer live (session-32, ADR-011: /sitemap.xml + allow-all /robots.txt + canonical/OG/twitter head tags + generated 1200×630 og-image.png, all composed from the unit-tested src/lib/seo.ts seam — PUBLIC_PATHS-derived sitemap, root title.template so sub-pages pass BARE titles, robots.txt deliberately has NO Disallow so the staff pages' noindex metas stay crawler-visible, everything head-only so rendered parity is untouched; e2e seo spec pins robots allow-all + absent Disallow, sitemap loc parity with the LL-11 host rewrite, canonical/OG/twitter tags, the og-image IHDR dimensions and the staff noindex metas; NEXT_PUBLIC_SITE_URL is baked at BUILD time — set it in production or the tags advertise localhost; the noindex staff pages also inherit the root canonical via metadata merging — inert, recorded in ADR-011 Consequences); appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); demo-seed closed at the root (session-28 F1: `SEED_DEMO=1 bun run db:seed` / `--demo` restores the 6 realistic dashboard rows — opt-in so production seeding never creates patient rows, idempotent (skip-if-exists by fullName — re-runs never duplicate or clobber real status transitions), self-renewing dates (now + offsetDays — the S26 F4 anti-erosion doctrine applied to seed data), specialties/statuses from the API's derived allowlists, every row a valid public-API payload by construction via the unit-tested src/lib/seed-demo.ts seam — the 4×-recurred workspace-reset seed-row class is dead); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u on dev/build/db:* INCLUDING db:generate since session-38); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past); doc-tree inventories complete (session-30 F1–F3: every file-tree listing across README/CLAUDE/SKILL §5 now covers all lib files + all unit seams + the demo-mode seed note — the missed-sibling inventory class swept)
+project_state: 169 unit tests + 63 e2e tests green; BAKED_ORIGIN derivation live (session-40, the 21st audit's F1 — the High that closed the documented session-34 A4 coupling: tests/e2e/seo.spec.ts hardcoded BAKED_ORIGIN = "http://localhost:3000" so the suite failed exactly 5/63 under the operator's production-baked build, and the mismatched loc.replace() silently turned the loc-parity test into an EXTERNAL fetch of the live origin; the spec now derives the origin from the SAME sources the build resolves with the SAME precedence — ambient NEXT_PUBLIC_SITE_URL → repo .env fs-parse → the siteUrl() dev default — green under ANY .env config, 63/63 proven under the production build); secrets-hygiene guard live (session-40 A1 — the FIRST Critical in 21 cycles, from an OPERATOR commit that pasted the LIVE .env into docs/start_server_log.txt and pushed the production AUTH_SECRET to the public remote: the tracked file is redacted, the paste-leak class is pinned by tests/secrets.test.ts — no 64-hex runs in doc surfaces, AUTH_SECRET empty-or-marker only, ADMIN_PASSWORD placeholders only, RED-proven against the leak — and live-key rotation is flagged as operator action in PAD §10); repo hygiene (session-40: the stray root package-lock.json removed — a bun-locked repo; bun.lock re-synced to the operator's package.json range bump, zero resolution changes; .gitignore + db/*.db-wal + db/*.db-shm); live-site verification green (session-40 — the first session against the live deployment https://family-clinic.jesspete.shop: all routes healthy, production origin correctly baked, the 12-step product loop 16/16 on the LIVE site incl. the CSV export with UTF-8 BOM, parity byte-exact on all three sites — reference/live/local: desktop 7490px, mobile panel 192×148 @ (178,80), link-click scrollY 1837 — mobile nav correct, NO Tailwind v4 bug, seventh consecutive session); CSV export UTF-8 BOM live (session-38, the 20th audit's F3: `appointmentsToCsv` emitted no EF BB BF signature — Excel double-click decodes BOM-less UTF-8 CSV with the system ANSI codepage, so a valid non-ASCII public-form fullName like `José García` exported as mojibake in the dominant clinic-spreadsheet app; the fix is the industry-standard file-level signature — exactly once, before the header row, never per-row, transparent to LibreOffice/Sheets, composing with the per-cell formula guard; 3 new unit pins + 3 updated exact-output pins + the e2e header pin RED-proven by temporarily reverting the BOM); the dead `!value.startsWith("'")` conjunct dropped from csvField (session-38 F4 — provably unreachable, `'` is not in the formula class; the no-double-guard unit pin stays as the regex-drift guard); `db:generate` now carries the env -u guard (session-38 F6 — the `db:*` blanket claim in AGENTS rule 8 is now literally true); CSV formula-injection guard live (session-36, the 19th audit's first-ever Medium: public-form names/phones/emails are attacker-controllable and `csvField` only guarded RFC 4180 chars — a `=WEBSERVICE(...)` fullName exported raw would evaluate in a staff spreadsheet and exfiltrate adjacent patient PII; the OWASP neutralization landed in `csvField` of src/lib/dashboard-filters.ts — cells leading with `= + - @` tab CR gain the apostrophe text-marker INSIDE the quotes, uniform across every exported column, ordinary values byte-identical, `'+65 …` phones still display verbatim; 6 RED unit cases + an e2e pin RED-proven by temporarily reverting the guard); duplicate-key filter parsing unified FIRST-wins (session-36 F5: the export route's Object.fromEntries collapsed repeated keys LAST-wins while the dashboard page's Next-searchParams path is first-wins — the new seam export `urlSearchParamsToRecord` + `firstValue` makes both surfaces identical by construction, 5 unit pins + 1 e2e pin); dashboard query layer live (session-34, ADR-012: status/specialty filters + case-insensitive search + CSV export, ALL composed from the unit-tested src/lib/dashboard-filters.ts seam — derived-allowlist parsing (bogus params dropped, never a 500), AND filtering across name/phone/email, RFC 4180 CSV with quote-doubling + CRLF, form-encoded query strings; the dashboard drives it with a NATIVE GET FORM (zero client islands, works without JS) reading searchParams, stats stay global, filters scope the table within the latest-100 window; GET /api/appointments/export serves the CSV — session-guarded with the PATCH doctrine, 60/10-min limiter, the SAME seam so the export always matches the visible view; e2e pins anon-401/derived-selects/filter/search/casefold/bogus-dropping/empty-state/export-respects-filter/RFC 4180 escaping; per-TEST fixture keys 198.51.126.<pid>.<n> — the 5/10-min POST limiter would 429 a single shared key); SEO discoverability layer live (session-32, ADR-011: /sitemap.xml + allow-all /robots.txt + canonical/OG/twitter head tags + generated 1200×630 og-image.png, all composed from the unit-tested src/lib/seo.ts seam — PUBLIC_PATHS-derived sitemap, root title.template so sub-pages pass BARE titles, robots.txt deliberately has NO Disallow so the staff pages' noindex metas stay crawler-visible, everything head-only so rendered parity is untouched; e2e seo spec pins robots allow-all + absent Disallow, sitemap loc parity with the LL-11 host rewrite, canonical/OG/twitter tags, the og-image IHDR dimensions and the staff noindex metas; NEXT_PUBLIC_SITE_URL is baked at BUILD time — set it in production or the tags advertise localhost; the noindex staff pages also inherit the root canonical via metadata merging — inert, recorded in ADR-011 Consequences); appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); demo-seed closed at the root (session-28 F1: `SEED_DEMO=1 bun run db:seed` / `--demo` restores the 6 realistic dashboard rows — opt-in so production seeding never creates patient rows, idempotent (skip-if-exists by fullName — re-runs never duplicate or clobber real status transitions), self-renewing dates (now + offsetDays — the S26 F4 anti-erosion doctrine applied to seed data), specialties/statuses from the API's derived allowlists, every row a valid public-API payload by construction via the unit-tested src/lib/seed-demo.ts seam — the 4×-recurred workspace-reset seed-row class is dead); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u on dev/build/db:* INCLUDING db:generate since session-38); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past); doc-tree inventories complete (session-30 F1–F3: every file-tree listing across README/CLAUDE/SKILL §5 now covers all lib files + all unit seams + the demo-mode seed note — the missed-sibling inventory class swept)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -364,9 +364,10 @@ API calls surface there. API failures log structured messages
 ```bash
 bun run lint          # 0 errors
 bun run typecheck     # clean (TRUE strict: noImplicitAny enforced)
-bun run test          # 166/166 (db-path 19 + auth 19 + deps 4 +
+bun run test          # 169/169 (db-path 19 + auth 19 + deps 4 +
                       #  validation 27 + rate-limit 20 + status 10 +
-                      #  seed-demo 8 + seo 14 + dashboard-filters 45)
+                      #  seed-demo 8 + seo 14 + dashboard-filters 45 +
+                      #  secrets 3)
 bun run build         # OK; routes: / /login /privacy-policy /
                       # accessibility-statement /robots.txt /sitemap.xml
                       # static; /api/* /dashboard dynamic
@@ -383,7 +384,9 @@ anonymous `/dashboard` → 307 to `/login`; anonymous
 
 Git: Conventional Commits, `main` only, never commit `.env` / `db/*.db` /
 keys; push via `docs/ssh_git_wrapper_v3.py` (runbook:
-`docs/how-to-git-push-using-ssh-wrapper_SKILL.md`).
+`docs/how-to-git-push-using-ssh-wrapper_SKILL.md`). NEVER paste a live
+`.env` into a tracked doc — `tests/secrets.test.ts` fails the suite on
+pasted key material (session-40 A1) and any leak means live rotation.
 
 ---
 
@@ -1171,3 +1174,70 @@ exist and misleads the next reader — prove it dead, then delete it (keep
 the pin). Doc sweeps must cover EVERY file that makes count claims, not
 just the familiar five — DEPLOYMENT.md had been skipped by four
 consecutive sweeps. SKILL.md → v2.9.0.
+
+### [S40] 21st audit cycle — live-site verification, BAKED_ORIGIN closure, live-secret redaction
+
+The first session run against the LIVE production deployment
+(`https://family-clinic.jesspete.shop`, deployed per the operator's
+start-server log). Baseline re-established from a fresh clone under the
+operator's PRODUCTION `.env` (`NEXT_PUBLIC_SITE_URL` = the live origin):
+166/166 unit + build OK, but the e2e suite failed exactly 5/63 — the
+documented session-34 A4 `BAKED_ORIGIN` coupling, finally triggered by a
+real production-baked artifact. The 21st fresh-eyes audit (read-only
+subagent + orchestrator re-verification at file:line precision) returned
+**1 Critical + 1 High + 1 Medium + 1 Low + 5 Info — the first Critical in
+21 cycles, from an OPERATOR commit that bypassed the gate discipline**
+(`a4109d5` pasted the LIVE `.env` into `docs/start_server_log.txt` and
+pushed the production `AUTH_SECRET` to the public remote; the same commit
+added a stray root `package-lock.json` to a bun-locked repo).
+
+Remediation (TDD-first, `docs/remediation-plan-session40.md`):
+
+- **Track A (F1, High):** the seo spec's `BAKED_ORIGIN` derivation — the
+  same sources the build resolves, the same precedence (ambient
+  `NEXT_PUBLIC_SITE_URL` → repo `.env` fs-parse → the `siteUrl()` dev
+  default; `process.cwd()` anchor per the global-setup CJS-loader
+  precedent). RED was the live 5/63 failure set (the existing pins ARE
+  the proof); GREEN = 63/63 under the production build. Second-order
+  fix: the loc-parity test's `loc.replace(BAKED_ORIGIN, "")` works
+  again — under the hardcode the no-op replace silently turned it into
+  an EXTERNAL fetch of the live origin (an external-network false-green).
+- **Track B (A1, Critical):** `tests/secrets.test.ts` (3 pins: no 64-hex
+  runs in doc surfaces, AUTH_SECRET empty-or-marker only, ADMIN_PASSWORD
+  placeholders only) — RED-proven against the actual leak (exactly 2
+  failures: the pasted hex + the non-empty assignment; the RED run also
+  caught two test-design false-positive classes — markdown backtick
+  mentions of the variable names and the `\$`-escaped doc examples —
+  fixed while the leak stayed failing) → the tracked file redacted.
+  Live-key rotation is OPERATOR action (PAD §10 HIGH row): rotate
+  `AUTH_SECRET` + change `ADMIN_PASSWORD` on the server; a history purge
+  is a deliberate operator decision (never force-push autonomously).
+- **Track C (A2/A3):** `package-lock.json` removed (bun-locked repo);
+  `bun.lock` re-synced (the operator's range bump had left it stale
+  since session-28 — root-block mirror only, zero resolution changes);
+  `.gitignore` + `db/*.db-wal` + `db/*.db-shm`.
+- **Track D:** README Architecture rows completed; PAD §11 re-measured.
+
+Live-site verification (before remediation, all green): every route
+healthy; the production origin correctly baked in canonical/OG/robots/
+sitemap; **the 12-step product loop 16/16 ON THE LIVE SITE** (anon 307 →
+login 200 + httpOnly → authed 200 → public POST 201 → PATCH confirmed →
+PATCH completed → anon PATCH 401 → 404 → 422 → CSV export 200 with the
+UTF-8 BOM + probe row → wrong-creds 401 → logout → post-logout 307);
+parity byte-exact on ALL THREE sites (reference / live / local): desktop
+7490px exact + 7/7 ids + byte-identical h2s; mobile panel 192×148 @
+(178,80) grid r24 p8; link-click close+unmount + scrollY 1837 +
+services-at-top 0.0005 — **mobile navigation correct on every site, NO
+Tailwind v4 bug (seventh consecutive session)**. One clearly-labeled
+probe row ("Live Verification Probe Safe To Delete", completed) left in
+the live DB for operator deletion — the API has no DELETE by design.
+
+**Doctrine:** an e2e expectation must be derived from the same source
+the production artifact was built from — a hardcoded expectation is a
+time bomb under config change, and a mismatched host-rewrite can turn a
+locality test into an external dependency. The biggest security risks in
+a well-tested repo come from OUTSIDE the code: operator commits that
+bypass the gate discipline. Guard the leak CLASS (doc-surface scan), not
+just the instance — and know what you cannot fix from here (rotation is
+a server-side action; say so loudly). Unit 166 → 169; e2e stays 63.
+SKILL.md → v2.9.1.

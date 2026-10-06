@@ -49,7 +49,7 @@ geometry).
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
 | 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + a query bar (status filter, specialty filter, case-insensitive search — a native GET form, works without JS) + latest 100 requests with status transitions (New → Confirmed → Completed via `PATCH /api/appointments/[id]`) + a one-click CSV export that respects the active filters (`GET /api/appointments/export`, RFC 4180), server-guarded |
 | 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), strict server-side payload validation, and baseline security headers on every route response and app-level redirect (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, no `X-Powered-By`; the framework's internal 308 trailing-slash redirect is emitted before `headers()` applies — a documented, e2e-pinned limitation) |
-| ✅ Tested | 166 unit tests + 63 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), the dashboard query layer (derived-allowlist parsing, filter/search/casefold pins, bogus-param dropping, the empty-filter state, export-respects-filter + RFC 4180 escaping + the spreadsheet formula-injection guard + duplicate-key first-wins + the UTF-8 BOM), the SEO surface pins (robots allow-all + no-Disallow, sitemap loc parity — every advertised loc fetches 200, canonical/OG/twitter head tags, og-image 1200×630 IHDR pin, the staff noindex metas), and the validation + timing-equalization + status + demo-seed + seo-composition + dashboard-filters seams |
+| ✅ Tested | 169 unit tests + 63 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), the dashboard query layer (derived-allowlist parsing, filter/search/casefold pins, bogus-param dropping, the empty-filter state, export-respects-filter + RFC 4180 escaping + the spreadsheet formula-injection guard + duplicate-key first-wins + the UTF-8 BOM), the SEO surface pins (robots allow-all + no-Disallow, sitemap loc parity — every advertised loc fetches 200, canonical/OG/twitter head tags, og-image 1200×630 IHDR pin, the staff noindex metas; the expected baked origin is DERIVED from the build env so the suite is green under any `NEXT_PUBLIC_SITE_URL`), a secrets-hygiene pin (doc surfaces scanned for pasted key material — session-40), and the validation + timing-equalization + status + demo-seed + seo-composition + dashboard-filters seams |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified
@@ -70,8 +70,8 @@ geometry).
 | Icons | lucide-react | 0.525.x | All iconography |
 | Database | SQLite via Prisma ORM | 6.x | Appointment + staff persistence |
 | Auth | Node crypto (scrypt + HMAC-SHA256) | built-in | Staff sessions — zero external auth dependencies |
-| Unit tests | Vitest | 5.x | Pure seams (db-path resolution, auth crypto, appointment + status validation, rate limiting, dependency pin) |
-| E2E tests | Playwright | 1.x | Landing, mobile nav, form, legal pages, auth loop, appointment status management |
+| Unit tests | Vitest | 5.x | Pure seams (db-path resolution, auth crypto, appointment + status validation, rate limiting, dependency pin, demo seed, SEO composition, dashboard filters, secrets hygiene) |
+| E2E tests | Playwright | 1.x | Landing, mobile nav, form, legal pages, auth loop, appointment status management, SEO surfaces, dashboard filters + CSV export |
 
 ```mermaid
 flowchart TB
@@ -132,7 +132,8 @@ flowchart TB
 │                                   seo — robots/sitemap/canonical/OG/og-image/noindex pins,
 │                                   dashboard-filters — query-bar + CSV-export pins)
 📂 tests/*.test.ts                ← Vitest seams (db-path, auth, deps, validation,
-│                                   rate-limit, status, seed-demo, seo, dashboard-filters)
+│                                   rate-limit, status, seed-demo, seo, dashboard-filters,
+│                                   secrets)
 📂 public/media/                  ← Hero video/poster, section photography
 📂 public/og-image.png            ← Generated 1200×630 social card (session-32)
 📂 docs/                          ← Validation report, screenshots, deployment
@@ -202,7 +203,7 @@ The `dev` / `build` / `db:*` scripts strip any ambient `DATABASE_URL`
 ```bash
 bun run lint          # ESLint (flat config) — 14 correctness rules ON, every deliberate off documented
 bun run typecheck     # tsc --noEmit (true strict)
-bun run test          # Vitest unit layer (db-path + auth + deps + validation + rate-limit + status + seed-demo + seo + dashboard-filters seams)
+bun run test          # Vitest unit layer (db-path + auth + deps + validation + rate-limit + status + seed-demo + seo + dashboard-filters + secrets seams)
 bun run build         # production standalone build (types enforced)
 bun run test:e2e      # Playwright — boots the standalone server + scratch DB
 ```

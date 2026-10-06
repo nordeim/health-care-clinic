@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
 // SEO surfaces (session-32, ADR-011) — the served contract for the
@@ -8,12 +10,40 @@ import { expect, test } from "@playwright/test";
 //
 // ORIGIN NOTE (the LL-11 lesson, from the nextjs-postgresql-single-app
 // skill): the sitemap and the head tags are STATIC — their absolute URLs
-// are BAKED at `bun run build` time from NEXT_PUBLIC_SITE_URL (the repo
-// .env: http://localhost:3000). The e2e server runs on :3100, so every
-// cross-origin fetch in this spec host-rewrites the baked origin to the
-// test base URL before requesting (never fetch the baked origin itself).
+// are BAKED at `bun run build` time from NEXT_PUBLIC_SITE_URL. The e2e
+// server runs on :3100, so every cross-origin fetch in this spec
+// host-rewrites the baked origin to the test base URL before requesting
+// (never fetch the baked origin itself).
+//
+// DERIVATION CONTRACT (session-40, the session-34 A4 coupling closed): the
+// build resolves the baked origin as ambient NEXT_PUBLIC_SITE_URL → the
+// repo .env value → http://localhost:3000 (the siteUrl() fallback in
+// src/lib/seo.ts). This spec derives BAKED_ORIGIN from the SAME sources
+// with the SAME precedence so the suite stays green under ANY .env
+// configuration — the dev default AND a production origin. Source 1:
+// process.env.NEXT_PUBLIC_SITE_URL (bun-run loads the repo .env into the
+// Playwright process, and ambient env beats .env — identical to what
+// `next build` resolves; the playwright.config AUTH_SECRET comment
+// documents the same bun-run behavior). Source 2: a direct parse of
+// <repo-root>/.env for the `npx playwright test` path (anchored on
+// process.cwd() per the documented global-setup.ts precedent — Playwright
+// transpiles specs through its CJS loader, so import.meta is unavailable).
+// Source 3: the seo.ts dev-default fallback.
 
-const BAKED_ORIGIN = "http://localhost:3000";
+function bakedOrigin(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL;
+  if (fromEnv) return fromEnv;
+  try {
+    const envText = readFileSync(join(process.cwd(), ".env"), "utf8");
+    const match = envText.match(/^NEXT_PUBLIC_SITE_URL=["']?([^"'\r\n]+?)["']?\s*$/m);
+    if (match?.[1]) return match[1];
+  } catch {
+    // No .env (e.g. CI with env vars only) — fall through to the default.
+  }
+  return "http://localhost:3000";
+}
+
+const BAKED_ORIGIN = bakedOrigin();
 
 test.describe("robots.txt", () => {
   test("serves an allow-all policy with the sitemap reference", async ({ request }) => {

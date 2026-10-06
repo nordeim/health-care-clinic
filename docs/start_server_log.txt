@@ -2,9 +2,9 @@ $ grep -v '^#' .env
 
 DATABASE_URL="file:../db/custom.db"
 NEXT_PUBLIC_SITE_URL=https://family-clinic.jesspete.shop
-AUTH_SECRET="9a35c3cff74b54a08e489cbc8762d81a03596939cb7971e7e45f8674ae25f487"
+AUTH_SECRET="<redacted session-40 — a live secret must never be pasted into a tracked file; rotate the live value>"
 ADMIN_EMAIL="admin@example.com"
-ADMIN_PASSWORD="change-me"
+ADMIN_PASSWORD="<redacted session-40 — use your own strong value, never the doc placeholder, in production>"
 
 $ bun install
 [0.05ms] ".env"
