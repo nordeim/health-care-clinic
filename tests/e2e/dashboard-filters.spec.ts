@@ -248,9 +248,10 @@ test.describe("dashboard query layer (filters + CSV export)", () => {
       /^attachment; filename="appointments-\d{4}-\d{2}-\d{2}\.csv"$/,
     );
     const csv = await response.text();
-    // Header row (CRLF row separator — RFC 4180).
+    // UTF-8 signature (session-38) + header row (CRLF separator — RFC 4180).
+    // response.text() decodes the leading EF BB BF bytes as U+FEFF.
     expect(csv.startsWith(
-      "Requested at,Full name,Phone,Email,Specialty,Preferred date,Status\r\n",
+      "\uFEFFRequested at,Full name,Phone,Email,Specialty,Preferred date,Status\r\n",
     )).toBe(true);
     // The ACTIVE view: the New fixture is exported, the Confirmed one is not.
     expect(csv).toContain(`Filters E2E Alpha ${stamp}`);

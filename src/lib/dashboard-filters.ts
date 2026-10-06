@@ -138,18 +138,25 @@ const FORMULA_LEADING = /^[=+\-@\t\r]/;
 
 /** Quote a field when it contains a comma, quote, CR, or LF; embedded
  * quotes are doubled (RFC 4180 §2.7); formula-leading cells gain the
- * apostrophe text-marker first (the guard composes INSIDE the quotes). */
+ * apostrophe text-marker first (the guard composes INSIDE the quotes).
+ * Apostrophe-leading values need no exclusion: `'` is not in the formula
+ * class, so they can never match FORMULA_LEADING — they export verbatim
+ * (safe by construction; the unit pin guards against regex drift). */
 function csvField(value: string): string {
-  const safe = FORMULA_LEADING.test(value) && !value.startsWith("'")
-    ? `'${value}`
-    : value;
+  const safe = FORMULA_LEADING.test(value) ? `'${value}` : value;
   return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
-/** Compose the export: header row, ISO 8601 dates, raw status values (the
- * API value space — round-trippable), empty fields for nulls, CRLF row
- * separators. Dates are rendered from their ISO instant so the export is
- * timezone-stable regardless of the server's locale. */
+/** Compose the export: UTF-8 signature (BOM), header row, ISO 8601 dates,
+ * raw status values (the API value space — round-trippable), empty fields
+ * for nulls, CRLF row separators. Dates are rendered from their ISO
+ * instant so the export is timezone-stable regardless of the server's
+ * locale. The BOM (session-38) is the industry-standard Excel
+ * compatibility fix: Excel double-click decodes a BOM-less UTF-8 CSV with
+ * the system ANSI codepage, mojibake-ing non-ASCII patient names; the
+ * signature makes UTF-8 auto-detected. File-level prefix — exactly once,
+ * before the header row (never per-row), transparent to
+ * LibreOffice/Sheets, and it composes with the per-cell formula guard. */
 export function appointmentsToCsv(
   rows: readonly DashboardAppointment[],
 ): string {
@@ -169,7 +176,7 @@ export function appointmentsToCsv(
         .join(","),
     );
   }
-  return `${lines.join("\r\n")}\r\n`;
+  return `\uFEFF${lines.join("\r\n")}\r\n`;
 }
 
 /** Canonical query string for the ACTIVE filters (empty values dropped,

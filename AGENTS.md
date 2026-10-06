@@ -150,7 +150,12 @@ inline in components.
     RED-proven. Duplicate filter keys parse FIRST-wins on BOTH the
     dashboard page and the export route (the seam's
     `urlSearchParamsToRecord` + `firstValue`) — keep the export route on
-    that conversion, never `Object.fromEntries` (last-wins).
+    that conversion, never `Object.fromEntries` (last-wins). The export
+    also carries a UTF-8 BOM prefix (session-38): Excel double-click
+    decodes BOM-less UTF-8 CSV as ANSI and mojibake-s non-ASCII patient
+    names — the signature is a file-level prefix (exactly once, before
+    the header row, never per-row) that composes with the per-cell guard;
+    the e2e header pin expects it.
 
 ## Conventions
 
@@ -199,7 +204,7 @@ inline in components.
 - **Count e2e tests at RUNTIME, not by declaration (session-34 A3):**
   `tests/e2e/seo.spec.ts` declares 7 `test()` blocks but executes 9 —
   the data-driven loops at :109 (legal pages ×2) and :151 (staff
-  noindex ×2) expand per iteration. The suite is 61 tests at runtime;
+  noindex ×2) expand per iteration. The suite is 63 tests at runtime;
   a declaration-only grep would undercount by 2.
 - Playwright's `globalSetup` pushes the schema to `db/e2e.db` and seeds the
   e2e staff account (E2E_ADMIN_EMAIL/PASSWORD exported from global-setup.ts);

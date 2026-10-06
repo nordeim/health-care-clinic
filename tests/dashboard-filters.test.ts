@@ -163,10 +163,10 @@ describe("filterAppointments", () => {
 });
 
 describe("appointmentsToCsv", () => {
-  it("emits exactly the header row for an empty table", () => {
+  it("emits exactly the BOM + header row for an empty table", () => {
     const csv = appointmentsToCsv([]);
     expect(csv).toBe(
-      "Requested at,Full name,Phone,Email,Specialty,Preferred date,Status\r\n",
+      "\uFEFFRequested at,Full name,Phone,Email,Specialty,Preferred date,Status\r\n",
     );
   });
 
@@ -185,7 +185,7 @@ describe("appointmentsToCsv", () => {
     // The +leading international phone gains the apostrophe text-marker
     // (the session-36 formula guard) — displays verbatim, never evaluates.
     expect(csv).toBe(
-      "Requested at,Full name,Phone,Email,Specialty,Preferred date,Status\r\n" +
+      "\uFEFFRequested at,Full name,Phone,Email,Specialty,Preferred date,Status\r\n" +
         "2026-10-01T10:30:00.000Z,James Okafor,'+1 555 010 0002,,Family care,,confirmed\r\n",
     );
   });
@@ -210,7 +210,9 @@ describe("appointmentsToCsv", () => {
     // The trailing CRLF leaves one empty tail element after split.
     expect(lines).toHaveLength(4);
     expect(lines[3]).toBe("");
-    expect(lines[0]).toBe("Requested at,Full name,Phone,Email,Specialty,Preferred date,Status");
+    // The BOM (session-38) rides the header line ONLY — data lines never.
+    expect(lines[0]).toBe("\uFEFFRequested at,Full name,Phone,Email,Specialty,Preferred date,Status");
+    expect(lines[1].startsWith("\uFEFF")).toBe(false);
     expect(lines[1]).toContain("Maria Sanchez");
     expect(lines[2]).toContain("B");
     expect(csv.endsWith("\r\n")).toBe(true);
@@ -277,6 +279,43 @@ describe("appointmentsToCsv — spreadsheet formula guard (session-36, OWASP CSV
     const csv = appointmentsToCsv([row({ fullName: "'Maria" })]);
     expect(dataLine(csv)).toContain("'Maria");
     expect(dataLine(csv)).not.toContain("''Maria");
+  });
+});
+
+describe("appointmentsToCsv — UTF-8 BOM (session-38, Excel ANSI-decode class)", () => {
+  /* The public form accepts non-ASCII full names (no charset rule — by
+   * design), so a BOM-less UTF-8 CSV attachment opened by double-click in
+   * Excel — the dominant clinic-spreadsheet app — is decoded with the
+   * system ANSI codepage and "José García" renders as mojibake. The fix
+   * is the industry-standard UTF-8 signature (EF BB BF) as a FILE-LEVEL
+   * prefix: exactly once, before the header row, never per-row.
+   * LibreOffice/Sheets treat it as a signature (transparent); RFC 4180
+   * does not forbid it. It composes with the formula guard unchanged —
+   * the guard is per-cell, the BOM is per-file. */
+  const dataLine = (csv: string) => csv.split("\r\n")[1];
+
+  it("prefixes the BOM exactly once — never per-row", () => {
+    const csv = appointmentsToCsv([row(), row({ id: "r2", fullName: "B" })]);
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    // Exactly once: no second BOM anywhere after the first character.
+    expect(csv.indexOf("\uFEFF", 1)).toBe(-1);
+    // Data lines are byte-identical to the BOM-less body.
+    expect(dataLine(csv)).not.toContain("\uFEFF");
+    expect(csv.split("\r\n")[2]).not.toContain("\uFEFF");
+  });
+
+  it("exports non-ASCII names verbatim after the BOM (the F3 case)", () => {
+    const csv = appointmentsToCsv([row({ fullName: "José García" })]);
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    expect(dataLine(csv)).toContain("José García");
+    expect(dataLine(csv)).not.toContain("JosÃ");
+  });
+
+  it("composes the BOM with the formula guard (accented payload)", () => {
+    const csv = appointmentsToCsv([row({ fullName: "=SUMA(A1:É9)" })]);
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    expect(dataLine(csv)).toContain("'=SUMA(A1:É9)");
+    expect(dataLine(csv)).not.toMatch(/(^|,)=SUMA/);
   });
 });
 

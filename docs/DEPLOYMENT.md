@@ -12,7 +12,8 @@ bun run build          # next build + standalone assembly (.next/standalone)
 ```
 
 The build prerenders the landing, legal, and staff sign-in pages,
-compiles the four API route handlers (`/api/appointments`,
+compiles the six API route handlers (`/api/appointments` POST,
+`/api/appointments/[id]` PATCH, `/api/appointments/export` GET,
 `/api/auth/login`, `/api/auth/logout`, `/api/health`), and copies
 `.next/static` and `public/` into `.next/standalone/` (see the `build`
 script in `package.json`). `next.config.ts` pins `outputFileTracingRoot`
@@ -99,8 +100,10 @@ the database is unreachable — wire your uptime monitor to it.
 
 ## 6. Reverse proxy notes
 
-- Forward `X-Forwarded-For` — the appointment AND login rate limiters key
-  on it. Both styles work, because the limiter keys on the **LAST**
+- Forward `X-Forwarded-For` — ALL FOUR rate limiters key on it (the
+  public appointments POST 5/10 min, login 10/10 min, the PATCH status
+  transition 60/10 min, and the CSV export 60/10 min). Both styles
+  work, because the limiters key on the **LAST**
   X-Forwarded-For token (the address the proxy appended — the only
   trustworthy one):
   - append style: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`
@@ -115,7 +118,8 @@ the database is unreachable — wire your uptime monitor to it.
   first). Login also burns scrypt ASYNC on the libuv threadpool since
   session 10, so spoofed-key bursts can no longer starve the event loop.
 - Request bodies are capped at 64 KiB **in-process while stream-reading**
-  (session 10): both POST routes return 413 the moment the byte count
+  (session 10): all three body-capped routes (the appointments POST, the
+  login POST, and the status PATCH) return 413 the moment the byte count
   crosses the cap — chunked bodies without a `content-length` header are
   capped identically. A proxy `client_max_body_size` is therefore optional
   belt-and-braces, not the enforcement.

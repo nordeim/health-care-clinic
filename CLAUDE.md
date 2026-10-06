@@ -168,14 +168,16 @@ non-obvious-rules list; this file holds the reasoning.
   constants, the ≤160-char SERP description bound, the PUBLIC_PATHS
   allowlist (never the noindex routes), canonical/OG/twitter composition,
   the OG image dimension contract, the bare-title rule — session-32),
-  and the dashboard query seam (`tests/dashboard-filters.test.ts`, 42
+  and the dashboard query seam (`tests/dashboard-filters.test.ts`, 45
   cases: derived-allowlist parsing incl. empty GET-form controls and
   array shapes, AND filtering with case-insensitive search across
   name/phone/email, RFC 4180 CSV quoting with doubled embedded quotes +
   CRLF rows + null-field handling, the form-encoded query-string
   round-trip — session-34, ADR-012; plus the OWASP spreadsheet
   formula-injection guard cases and the `urlSearchParamsToRecord`
-  duplicate-key first-wins round-trip — session-36).
+  duplicate-key first-wins round-trip — session-36; plus the UTF-8
+  BOM pins (exactly-once file-level prefix, non-ASCII verbatim export,
+  BOM × guard composition) — session-38).
 - **E2E (Playwright):** eight spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
@@ -287,7 +289,7 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  163/163 unit, build OK, 63/63 e2e).
+  166/166 unit, build OK, 63/63 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).

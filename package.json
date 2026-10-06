@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "db:push": "env -u DATABASE_URL prisma db push --accept-data-loss",
-    "db:generate": "prisma generate",
+    "db:generate": "env -u DATABASE_URL prisma generate",
     "db:migrate": "env -u DATABASE_URL prisma migrate dev",
     "db:reset": "env -u DATABASE_URL prisma migrate reset",
     "db:seed": "env -u DATABASE_URL bun scripts/seed.ts",
