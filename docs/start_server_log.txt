@@ -1,0 +1,83 @@
+$ grep -v '^#' .env
+
+DATABASE_URL="file:../db/custom.db"
+NEXT_PUBLIC_SITE_URL=https://family-clinic.jesspete.shop
+AUTH_SECRET="9a35c3cff74b54a08e489cbc8762d81a03596939cb7971e7e45f8674ae25f487"
+ADMIN_EMAIL="admin@example.com"
+ADMIN_PASSWORD="change-me"
+
+$ bun install
+[0.05ms] ".env"
+bun install v1.3.14 (0d9b296a)
+
+43 packages installed [10.09s]
+
+$ rm -rf db
+
+$ bun run db:push
+$ env -u DATABASE_URL prisma db push --accept-data-loss
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": SQLite database "custom.db" at "file:../db/custom.db"
+
+SQLite database custom.db created at file:../db/custom.db
+
+🚀  Your database is now in sync with your Prisma schema. Done in 639ms
+
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 288ms
+
+$ ls -l db/
+total 28
+-rw-r--r-- 1 pete pete 28672 Oct  6 18:28 custom.db
+
+$ bun run db:seed
+$ env -u DATABASE_URL bun scripts/seed.ts
+prisma:query INSERT INTO `main`.`admin_users` (`id`, `email`, `passwordHash`, `createdAt`) VALUES (?,?,?,?) ON CONFLICT  (`email`) DO UPDATE SET `passwordHash` = ? WHERE (`main`.`admin_users`.`email` = ? AND 1=1) RETURNING `id` AS `id`, `email` AS `email`, `createdAt` AS `createdAt`
+[db:seed] staff account ready: admin@example.com
+
+$ ls -l db/
+total 28
+-rw-r--r-- 1 pete pete 28672 Oct  6 18:28 custom.db
+
+$ bun run build
+$ env -u DATABASE_URL next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/
+▲ Next.js 16.3.8 (Turbopack)
+- Environments: .env
+✓ Running next.config.ts took 33ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 19.6s
+✓ Finished TypeScript in 4.9s
+✓ Collecting page data using 3 workers in 1029ms
+✓ Generating static pages using 3 workers (14/14) in 318ms
+✓ Finalizing page optimization in 3.8s
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /accessibility-statement
+├ ƒ /api/appointments
+├ ƒ /api/appointments/[id]
+├ ƒ /api/appointments/export
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/health
+├ ƒ /dashboard
+├ ○ /icon.svg
+├ ○ /login
+├ ○ /privacy-policy
+├ ○ /robots.txt
+└ ○ /sitemap.xml
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+$ PORT=3001 bun run start
+$ NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log
+▲ Next.js 16.3.8
+- Local:         http://localhost:3001
+- Network:       http://0.0.0.0:3001
+✓ Ready in 0ms
+✓ Running next.config took 3ms
+
