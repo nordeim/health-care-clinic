@@ -8,10 +8,10 @@ description: >
   reference-parity doctrine, the six documented Tailwind v4 engine traps
   and their mitigations, the environment-determinism guards, the testing
   methodology, and every hard-won lesson from sessions 1, 2, 4, 6, 8, 10,
-  12, 14, 16, 18, 20, 22, 24, 26 and 28.
-version: 2.8.5
+  12, 14, 16, 18, 20, 22, 24, 26, 28 and 30.
+version: 2.8.6
 last_updated: 2026-10-06
-project_state: 107 unit tests + 44 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); demo-seed closed at the root (session-28 F1: `SEED_DEMO=1 bun run db:seed` / `--demo` restores the 6 realistic dashboard rows — opt-in so production seeding never creates patient rows, idempotent (skip-if-exists by fullName — re-runs never duplicate or clobber real status transitions), self-renewing dates (now + offsetDays — the S26 F4 anti-erosion doctrine applied to seed data), specialties/statuses from the API's derived allowlists, every row a valid public-API payload by construction via the unit-tested src/lib/seed-demo.ts seam — the 4×-recurred workspace-reset seed-row class is dead); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past)
+project_state: 107 unit tests + 44 e2e tests green; appointment status management live (PATCH /api/appointments/[id], session-guarded + rate-limited 60/10min + allowlisted via the content-derived status seam; dashboard New→Confirmed→Completed); demo-seed closed at the root (session-28 F1: `SEED_DEMO=1 bun run db:seed` / `--demo` restores the 6 realistic dashboard rows — opt-in so production seeding never creates patient rows, idempotent (skip-if-exists by fullName — re-runs never duplicate or clobber real status transitions), self-renewing dates (now + offsetDays — the S26 F4 anti-erosion doctrine applied to seed data), specialties/statuses from the API's derived allowlists, every row a valid public-API payload by construction via the unit-tested src/lib/seed-demo.ts seam — the 4×-recurred workspace-reset seed-row class is dead); HTTP edge fully closed (stream-read 64 KiB cap for every transport shape incl. chunked, transport-error tolerance — client aborts degrade to 400, non-object body tolerance on all three POST/PATCH routes, async scrypt with preserved timing equalization, last-token XFF rate limiting, impossible-date rejection, email bound at 254 on BOTH routes); baseline security headers on every route response and app-level redirect (nosniff / X-Frame-Options DENY / Referrer-Policy, X-Powered-By suppressed; the framework's internal 308 trailing-slash redirect is the documented, e2e-pinned exception); env-leak guard active (env -u); lint gate honest (14 correctness rules ON, every off documented, the no-html-link-for-pages blind spot recorded); e2e per-run keys pid-derived on EVERY request incl. browser-driven POSTs/PATCHes via page.route injection AND the malformed-payload login POST (structurally collision-proof, unknown bucket never touched — the session-20 F1 closure made this literally true for every request in the suite); vitest.config.mts (native ESM load, no Vite CJS warning); db-path module-anchor decode-hardened (session-22 F10: moduleSelfRoot decodes %-escaped URLs — a repo path with spaces/#/non-ASCII no longer silently skips the anchor); credential hygiene closed (session-22 F1: doc escaping-examples are OBVIOUS PLACEHOLDERS so no bootstrap can adopt them as the live password); favicon chrome parity closed (session-24 F2: the reference's inline SVG favicon vendored verbatim as src/app/icon.svg — App Router file convention, e2e-pinned; the reference's /favicon.ico 302 fallback deliberately not replicated, platform artifact); e2e time-erosion closed (session-26 F4: the impossible-dates pin now computes future-year literals — its rollover targets are always future so only the round-trip check can reject them; the pin failed Red-first against a deliberately-broken seam, and the 2025 literals it replaced had eroded to tautology once they fell into the past); doc-tree inventories complete (session-30 F1–F3: every file-tree listing across README/CLAUDE/SKILL §5 now covers all 8 lib files + all 7 unit seams + the demo-mode seed note — the missed-sibling inventory class swept)
 ---
 
 # Green Grove Family Clinic — Engineering Skill
@@ -198,6 +198,7 @@ src/lib/content.ts           ALL copy, icon maps, nav contracts (as const)
 src/lib/auth.ts              scrypt + HMAC session primitives (pure)
 src/lib/validation.ts        appointment payload validation seam (pure)
 src/lib/rate-limit.ts        clientKey + fixed-window limiter + body cap (pure)
+src/lib/motion.ts            reduced-motion-aware scroll behavior (pure)
 src/lib/db.ts                Prisma singleton (globalThis in dev)
 src/lib/db-path.ts           SQLite URL resolution (pure, tested)
 scripts/seed.ts              db:seed staff upsert (the ONLY script — the
@@ -960,3 +961,40 @@ transitions green under the still-active ambient DATABASE_URL hijack;
 20 screenshots refreshed (03-desktop-full exactly 1440×7490; dashboards
 show the restored 6 seed rows; the capture's submission row purged
 after).
+
+### [S30] Session 30 — doc-inventory completion, 16th audit, parity re-verification
+
+The 16th fresh-eyes audit (3 findings, ALL Info, one class: file-tree
+inventory completeness; zero Critical/High/Medium, zero regressions) found
+the residuals fifteen prior audits never swept as a CLASS: three of the
+five living docs' file-tree inventories were missing files that shipped in
+earlier sessions — README's File Hierarchy lacked `seed-demo.ts` in the
+lib subtree, `seed-demo` in the tests parenthetical, and the demo-mode
+note on the `scripts/seed.ts` row (its Quick Start, Tested row, AGENTS
+table, `.env.example`, and PAD §3.2 all carried the demo-seed — only the
+tree was missed by the session-28 count-alignment pass); CLAUDE's File
+Organization lacked `seed-demo.ts` + the demo note (while its own Testing
+section listed the seam); SKILL §5's tree lacked `motion.ts` (shipped
+session-10 F7, present in README/CLAUDE/PAD §3.2 — the session-16 F6 pass
+fixed the omission in README/CLAUDE but never swept SKILL §5, and
+session-28's tree update for seed-demo still missed it). All three fixed
+with structural acceptance (grep: 8-of-8 lib files + 7-of-7 unit seams in
+every tree). Zero code changes — the code, security, parity, and test
+surfaces held under every probe shape. Live parity re-verified byte-exact
+on both sites at verified viewports (desktop 7490px both; mobile panel
+192×148 @ (178,80) grid r24 p8 — a `<nav>` in both sites; link-click
+0.421875 + scrollY 1837 BOTH; pill [37,74,57,204] ±1 oklab, dropdown
+[38,74,57,230] exact; mobile height 12162 vs 12164 — the documented 2px
+contact drift); the full 12-step product loop green under the still-active
+ambient DATABASE_URL hijack (write verified in `<repo>/db/custom.db`; the
+off-list specialty "Pediatrics" correctly 422'd first — the allowlist
+derivation live-proven, valid name "Pediatric care"); the workspace-reset
+seed-row class STAYED DEAD through this session's reset (the 6 demo rows
+survived — dates self-renewed 2026-10-08 → 2026-11-04). Gate re-held
+post-remediation: lint 0 / tsc / 107 unit / build identical routes /
+44 e2e × 2 (double-run proof); 20 screenshots refreshed (03-desktop-full
+exactly 1440×7490; dashboards show the 6 seed rows + the capture row,
+purged after); e2e.db at 45 rows = 5 runs × 9 (the documented
+accumulation, arithmetically perfect — living docs keep the open-ended
+"rows accumulate" wording per the S26 F6 families doctrine). SKILL.md →
+v2.8.6.

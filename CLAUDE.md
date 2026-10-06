@@ -65,9 +65,11 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 - `src/lib/` — `content.ts` (all copy/icon maps + status labels), `auth.ts`
   (scrypt + HMAC session primitives), `validation.ts` (appointment + status
   seams), `rate-limit.ts` (XFF keying, limiter, body cap), `motion.ts`
-  (reduced-motion scroll behavior), `db.ts`, `db-path.ts`
+  (reduced-motion scroll behavior), `db.ts`, `db-path.ts`, `seed-demo.ts`
+  (opt-in demo-row builder, session-28 F1)
 - `prisma/` — schema (Appointment + AdminUser models)
-- `scripts/seed.ts` — `db:seed` staff account upsert
+- `scripts/seed.ts` — `db:seed` staff account upsert (+ opt-in
+  `SEED_DEMO=1`/`--demo` mode restoring the 6 demo dashboard rows)
 - `tests/e2e/` — Playwright specs; `tests/*.test.ts` — Vitest seams
 
 ### Naming Conventions

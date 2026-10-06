@@ -114,13 +114,14 @@ flowchart TB
     ├── 📄 rate-limit.ts          ← XFF keying, fixed-window limiter, 64 KiB body cap (unit-tested)
     ├── 📄 motion.ts              ← Reduced-motion-aware scroll behavior
     ├── 📄 db.ts                  ← Prisma singleton (env-resolved URL)
-    └── 📄 db-path.ts             ← SQLite path resolution (unit-tested)
+    ├── 📄 db-path.ts             ← SQLite path resolution (unit-tested)
+    └── 📄 seed-demo.ts            ← Demo dashboard rows (opt-in, unit-tested — session-28 F1)
 📂 prisma/schema.prisma           ← Appointment + AdminUser models
-📂 scripts/seed.ts                ← db:seed — staff account upsert
+📂 scripts/seed.ts                ← db:seed — staff account upsert; SEED_DEMO=1/--demo restores the 6 demo rows (opt-in, idempotent)
 📂 tests/e2e/                     ← Playwright specs (mobile-navigation, landing,
 │                                   appointment-form, appointments-status, legal-pages, auth)
 📂 tests/*.test.ts                ← Vitest seams (db-path, auth, deps, validation,
-│                                   rate-limit, status)
+│                                   rate-limit, status, seed-demo)
 📂 public/media/                  ← Hero video/poster, section photography
 📂 docs/                          ← Validation report, screenshots, deployment
 ```
