@@ -30,6 +30,7 @@
 - `[S28]` Session-28 demo-seed root-cause closure + screenshot index + lock metadata (see `docs/remediation-plan-session28.md`): the fresh-eyes audit (15th; 3 findings: 1 Low, 2 Info, zero Critical/High/Medium, zero regressions) found the 6 realistic dashboard seed rows absent AGAIN — the 4th recurrence of the workspace-reset class (S20, S24, S26 each restored them through the public API by hand, and every fresh bootstrap erased them again). Remediated at the ROOT: `scripts/seed.ts` gained an OPT-IN demo mode (`SEED_DEMO=1` or `--demo`; default behavior byte-identical so production seeding per DEPLOYMENT.md §4 never creates patient rows) backed by the new pure seam `src/lib/seed-demo.ts` — 6 rows (2 new / 2 confirmed / 2 completed), specialties/statuses members of the API's derived allowlists, SELF-RENEWING dates (now + offsetDays — the session-26 F4 anti-erosion doctrine applied to seed data), every row a valid public-API payload by construction (the cross-seam test pushes each through validateAppointmentPayload), idempotent inserts (skip-if-exists by fullName — never duplicates, never clobbers real dashboard transitions). TDD Red-first (8 new unit cases failing on the missing module before landing; 99 → 107). Plus: README's Screenshots table gained the unreferenced 06-mobile-services.png row, and bun.lock's root workspace name corrected orbital → health-care-clinic with an install-stability proof. Count-alignment pass: every live unit-count reference 99 → 107 across README/CLAUDE×2/PAD×3/SKILL; §3.2 tree + §7.1 breakdown + §11 rows re-measured; deps pin untouched (scripts/ = seed.ts). E2E 44/44 × 2 (double-run proof); live parity re-verified byte-exact on both sites at verified viewports (desktop 7490px both; mobile panel 192×148 @ (178,80); link-click 0.421875 + scrollY 1837 both; rasterized dropdown [38,74,57,230] exact, pill [37,74,57,204] ±1 oklab); the full product loop green under the still-active ambient hijack; 20 screenshots refreshed (03-desktop-full exactly 1440×7490; dashboards show the restored 6 seed rows); SKILL.md → v2.8.5.
 - `[S30]` Session-30 doc-inventory completion + 16th audit + parity re-verification (see `docs/remediation-plan-session30.md`): the fresh-eyes audit (16th; 3 findings, ALL Info, one class — file-tree inventory completeness; zero Critical/High/Medium, zero regressions) found that three of the five living docs' file-tree inventories were missing files shipped in earlier sessions: README's File Hierarchy lacked `seed-demo.ts` in the lib subtree, `seed-demo` in the tests parenthetical, and the demo-mode note on the scripts/seed.ts row (the Quick Start, Tested row, AGENTS table, .env.example, and PAD §3.2 all carried the demo-seed — only the tree was missed by the session-28 count-alignment pass); CLAUDE's File Organization lacked `seed-demo.ts` + the demo note while its own Testing section listed the seam; SKILL §5's tree lacked `motion.ts` (shipped session-10 F7, present in README/CLAUDE/PAD §3.2 — the session-16 F6 pass fixed the omission in README/CLAUDE but never swept SKILL §5, and session-28's tree update still missed it). All three fixed with structural acceptance (grep: 8-of-8 lib files + 7-of-7 unit seams in every tree); zero code changes — the code, security, parity, and test surfaces held under every probe shape. Live parity re-verified byte-exact on both sites at verified viewports (desktop 7490px both; mobile panel 192×148 @ (178,80) grid r24 p8 — a `<nav>` in both sites; link-click 0.421875 + scrollY 1837 BOTH; pill [37,74,57,204] ±1 oklab, dropdown [38,74,57,230] exact; mobile height 12162 vs 12164 — the documented 2px contact drift); the full 12-step product loop green under the still-active ambient DATABASE_URL hijack (write verified in the repo DB; the off-list specialty "Pediatrics" correctly 422'd — the allowlist derivation live-proven); the workspace-reset seed-row class STAYED DEAD through this session's reset (the 6 demo rows survived, dates self-renewed). Gate re-held post-remediation: lint 0 / tsc / 107 unit / build identical routes / 44 e2e × 2 (double-run proof); 20 screenshots refreshed (03-desktop-full exactly 1440×7490; dashboards show the 6 seed rows; capture row purged after); SKILL.md → v2.8.6.
 - `[S32]` Session-32 SEO discoverability layer + 17th audit + parity re-verification (see `docs/remediation-plan-session32.md`): the operator's stated issue ("No sitemap and SEO hygiene mixed") confirmed and characterized by the fresh-eyes audit (17th; 10 findings: 4 Low + 6 Info, ALL one class — SEO discoverability; zero Critical/High/Medium, zero code bugs, zero regressions; every finding orchestrator-re-verified). The reference app has NO SEO infrastructure at all (robots.txt 404, sitemap.xml 404, no meta description — title JS-set only), so the entire remediation is a second beyond-parity HEAD-ONLY extension (ADR-011 — the ADR-009 doctrine applied to discoverability: zero rendered-body markup, parity contracts structurally untouched, live-proven: 7490px / panel 192×148 / link-click 0.421875+1837 / rasterized [38,74,57,230] all unchanged post-change). Remediated TDD-first in vertical slices: RED `tests/seo.test.ts` (14 cases) before the pure seam `src/lib/seo.ts` (brand + title-template constants, the ≤160 SERP description bound, the OG-image 1200×630 contract, the PUBLIC_PATHS sitemap allowlist — never the noindex routes, `siteUrl()`/`ogTitleFor()`/`pageMetadata()` composition); the ATOMIC title.template landing (root default+template, all four sub-pages' titles de-suffixed in one change — proved by the UNCHANGED legal-pages title pins, 16/16); RED `tests/e2e/seo.spec.ts` (9 tests, both new routes 404 first) before `src/app/sitemap.ts` + `src/app/robots.ts` + the generated `public/og-image.png` (Playwright render of an on-brand card — clinic green, the icon.svg heart-rate glyph, DM Sans; the generator lives OUTSIDE the repo per the deps contract). robots.txt is ALLOW-ALL by decision (a Disallow of the staff routes would HIDE their noindex metas from crawlers — Google's documented interaction; the spec pins the absent Disallow); JSON-LD deliberately skipped (the site's NAP is verbatim-reference placeholder data — schema would advertise fake phone/email); the sitemap's lastModified is the build time (self-renewing — the S26 F4 anti-erosion doctrine). Unit 107 → 121; e2e 44 → 53 (× 2 double-run proof); build 12 → 14 routes (/robots.txt + /sitemap.xml static). The workspace-reset re-bootstrap held (6 demo rows restored via SEED_DEMO=1; ambient DATABASE_URL hijack ACTIVE all session, every write in the repo DB — the 12-step product loop green). 20 screenshots refreshed (03-desktop-full exactly 1440×7490; capture row purged, 6 seed rows retained). NEXT_PUBLIC_SITE_URL upgraded from "optional" to production-recommended in §8.2/DEPLOYMENT/.env.example (canonical/OG/sitemap URLs are BAKED at build time from it — unset means localhost in those tags); §10 gained the SEO rows; SKILL.md → v2.8.7.
+- `[S34]` Session-33 dashboard query layer + 18th audit + parity re-verification (see `docs/remediation-plan-session34.md`): the fresh-eyes audit (18th; 5 findings: ALL Info — 4 doc residuals F1–F4 + 1 sandbox-tooling note; zero Critical/High/Medium/Low, zero code bugs, zero regressions; every finding orchestrator-re-verified) confirmed the session-32 SEO layer exact at every level, then shipped the recorded next beyond-parity step as **ADR-012**: the dashboard query layer (status filter + specialty filter + case-insensitive search + CSV export) composed from ONE pure seam `src/lib/dashboard-filters.ts` (RED-first 31 unit cases: derived-allowlist parsing, AND filtering across name/phone/email, RFC 4180 CSV with quote-doubling + CRLF, form-encoded query-string round-trip) — the page drives it with a native GET form (zero client islands, works without JS) reading `searchParams`, the stats stay global, and `GET /api/appointments/export` (session-guarded with the PATCH doctrine, 60/10-min limiter, same seam, attachment with a self-renewing date prefix) serves the CSV; unit 121 → 152, e2e 53 → 61 (RED-first `dashboard-filters` spec: anon-401, derived select options, filter/search/casefold/bogus-param/empty-state pins, export-respects-filter, RFC 4180 escaping; the auth spec's dashboard-row assertion row-scoped — the new specialty `<select>`'s hidden options shadow a page-wide `.first()` locator; per-TEST fixture keys 198.51.126.<pid>.<n> — the 5/10-min POST limiter would 429 a single shared key). Doc residuals closed: ADR-011 Consequences now names the inherited canonical on the noindex staff pages (F1) + the BAKED_ORIGIN build-env coupling (F4→A4 note); README tree rail fix (F2); the seo.spec loop-expansion declaration-vs-runtime note recorded in AGENTS (F3→A3). Parity re-verified on both sites before AND after (desktop 7490px; mobile panel 192×148 @ (178,80); link-click 0.421875/scrollY 1837; rasterized dropdown [38,74,57,230] exact, pill [37,74,57,204] ±1 oklab — mobile navigation working correctly, no Tailwind v4 bug); the 12-step product loop green under the still-active ambient DATABASE_URL hijack (probe rows purged, 6 seed rows retained). 20 screenshots refreshed (03-desktop-full exactly 1440×7490; dashboards show the query bar + 6 seed rows; the capture's submission row purged after). SKILL.md → v2.8.8.
 
 ---
 
@@ -292,13 +293,78 @@ with the reference at desktop and mobile widths.
   site's NAP copy is verbatim-reference placeholder data — publishing
   schema would advertise fake phone/email; revisit with real clinic
   data). The e2e seo spec host-rewrites the baked origin before fetching
-  (the LL-11 lesson). `noindex` pages inherit the root OG (harmless,
-  documented).
+  (the LL-11 lesson; the spec's `BAKED_ORIGIN` constant is coupled to the
+  repo-`.env` build default — a production-baked artifact requires
+  deriving it from the build env first, session-34 A4). `noindex` pages
+  inherit the root OG (harmless, documented) — session-34 A1: they ALSO
+  inherit the root `alternates.canonical` (the bare origin) through the
+  same metadata merge; equally inert under noindex,nofollow, recorded
+  here so a future audit does not re-discover it.
 - **Alternatives Rejected:** Mirroring the reference's nothing (leaves
   the operator's ask unmet); hand-duplicating Metadata objects per page
   (drifts — the seam is the single source); Disallow-based robots
   (breaks the noindex contract); JSON-LD with placeholder NAP
   (dishonest).
+
+---
+
+**ADR-012: Dashboard query layer — searchParams filtering + session-guarded CSV export (extends ADR-009)**
+
+- **Context:** Session-32's session record named the next beyond-parity
+  candidate: "dashboard filtering/search or CSV export for staff
+  records." At 100-request clinic scale the flat latest-100 table is
+  reviewable, but finding one caller among them — or handing records to
+  a front-desk export — is a real staff workflow the reference cannot
+  serve (it has no dashboard at all).
+- **Decision:** One pure seam (`src/lib/dashboard-filters.ts`,
+  unit-tested, 31 cases) owns the whole query composition:
+  `parseDashboardFilters` (status/specialty validated against the
+  content.ts-DERIVED allowlists — the same sets the API enforces;
+  bogus values dropped, never a 500; empty GET-form controls treated as
+  absent), `filterAppointments` (AND composition, case-insensitive
+  substring search across name/phone/email), `appointmentsToCsv`
+  (RFC 4180: comma/quote/line-break quoting with doubled embedded
+  quotes, CRLF rows, ISO 8601 dates, raw status values), and
+  `filtersToQueryString` (form-encoded, byte-compatible with a native
+  form submission). The dashboard page drives it with a native GET
+  `<form>` (zero client islands — server-rendered controls that work
+  without JavaScript) reading `searchParams`; the stats cards stay
+  GLOBAL (they describe the whole inbox; filters scope the table within
+  the latest-100 window). `GET /api/appointments/export` serves the
+  CSV: session-guarded with the PATCH route's doctrine (signed cookie +
+  admin row existence, 401 before any DB read), per-key rate-limited
+  60/10 min, filters parsed by the SAME seam, and
+  `Content-Disposition: attachment` with a request-time date prefix.
+- **Rationale:** The ADR-009 doctrine extended: the staff surface grows
+  a query layer the reference does not have, while the PUBLIC landing
+  experience stays byte-identical (zero rendered-body markup on public
+  routes — live-proven post-change: 7490px, panel geometry, link-click
+  all unchanged). One seam for the page and the route means the visible
+  view and the export can never disagree. The native GET form follows
+  the "Server Components by default" doctrine — no hydration surface,
+  progressively enhanced by default. In-memory filtering (not Prisma
+  `where`) because SQLite has no `mode: "insensitive"` — the seam's
+  case-insensitive search is deterministic and unit-testable.
+- **Consequences:** Unit 121 → 152; e2e 53 → 61 (the new
+  `dashboard-filters` spec: 8 tests incl. the anon-401, the derived
+  select options, filter/search/casefold pins, bogus-param dropping,
+  the empty-filter state, export-respects-filter, and RFC 4180
+  escaping). The auth spec's dashboard-row assertion gained row
+  scoping (the specialty `<select>`'s hidden `<option>` texts shadow a
+  page-wide `.first()` locator — the pin is now STRONGER, scoped to the
+  caller's row). Static `export` route segment resolves before the
+  sibling `[id]` dynamic segment (disjoint methods either way). The
+  e2e spec's fixture keys are per-TEST (`198.51.126.<pid>.<n>`) — the
+  appointments POST limiter is 5/10 min per key and this spec POSTs
+  from several tests; a single shared key would trip the 429 mid-suite.
+- **Alternatives Rejected:** DB-level Prisma filtering (SQLite lacks
+  case-insensitive contains; two filter code paths could drift);
+  client-island filter controls (adds hydration surface for zero
+  capability — the GET form works without JS); exporting beyond the
+  latest-100 window (a different feature — pagination — the surface
+  does not claim); a `download` attribute client-side CSV (bypasses the
+  session guard and the seam — one server route keeps the auth
+  doctrine).
 
 ---
 
@@ -386,11 +452,13 @@ health-care-clinic/
 │   │   ├── api/
 │   │   │   ├── appointments/route.ts ← POST: validate → limit → persist
 │   │   │   ├── appointments/[id]/route.ts ← PATCH: staff status transitions
+│   │   │   ├── appointments/export/route.ts ← GET: session-guarded CSV export (S34, ADR-012)
 │   │   │   ├── auth/login/route.ts   ← POST: scrypt verify + session cookie
 │   │   │   ├── auth/logout/route.ts  ← POST: clear session cookie
 │   │   │   └── health/route.ts      ← GET: SELECT 1 probe
 │   │   ├── login/page.tsx           ← staff sign-in (unlinked, noindex)
-│   │   ├── dashboard/page.tsx       ← session-guarded RSC: stats + table + status column
+│   │   ├── dashboard/page.tsx       ← session-guarded RSC: stats + query bar (native GET
+│   │   │                              form — S34 ADR-012) + table + status column
 │   │   ├── privacy-policy/page.tsx
 │   │   └── accessibility-statement/page.tsx
 │   ├── components/site/
@@ -421,6 +489,8 @@ health-care-clinic/
 │       ├── seo.ts                   ← metadata composition seam: brand, title template,
 │       │                               OG image contract, PUBLIC_PATHS sitemap allowlist,
 │       │                               pageMetadata factory (unit-tested — S32, ADR-011)
+│       ├── dashboard-filters.ts     ← the dashboard query seam: parse/filter/CSV/query-string
+│       │                               (unit-tested — S34, ADR-012)
 │       ├── db.ts                    ← Prisma singleton with env-resolved URL
 │       └── db-path.ts               ← pure URL resolution (unit-tested)
 ├── prisma/schema.prisma             ← Appointment (incl. status + updatedAt) + AdminUser models
@@ -722,13 +792,14 @@ end-to-end.
 
 | Category | Files | Tests | Location | Framework |
 | -------- | ----- | ----- | -------- | --------- |
-| Unit (pure seams) | 8 | 121 | `tests/db-path.test.ts` (19, incl. moduleSelfRoot decode), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin), `tests/status.test.ts` (10: allowlist derivation, case-sensitivity, type tightening, non-object tolerance), `tests/seed-demo.test.ts` (8: the 6-row contract, 2/2/2 split, derived allowlist membership, self-renewing dates, purity, cross-seam validity — session-28 F1), `tests/seo.test.ts` (14: brand/template constants, the ≤160 SERP description bound, PUBLIC_PATHS never the noindex routes, canonical/OG/twitter composition, OG-image dimensions, bare-title rule — session-32, ADR-011) | Vitest |
+| Unit (pure seams) | 9 | 152 | `tests/db-path.test.ts` (19, incl. moduleSelfRoot decode), `tests/auth.test.ts` (19, incl. timing equalization + async-scrypt contract), `tests/deps.test.ts` (4), `tests/validation.test.ts` (27, incl. timezone tolerance + email bound + specialty type tightening + upcoming-visits floor), `tests/rate-limit.test.ts` (20, incl. stream-read body cap + transport-error tolerance + bodyless-request pin), `tests/status.test.ts` (10: allowlist derivation, case-sensitivity, type tightening, non-object tolerance), `tests/seed-demo.test.ts` (8: the 6-row contract, 2/2/2 split, derived allowlist membership, self-renewing dates, purity, cross-seam validity — session-28 F1), `tests/seo.test.ts` (14: brand/template constants, the ≤160 SERP description bound, PUBLIC_PATHS never the noindex routes, canonical/OG/twitter composition, OG-image dimensions, bare-title rule — session-32, ADR-011), `tests/dashboard-filters.test.ts` (31: derived-allowlist parsing incl. empty-form-controls + array shapes, AND filtering + case-insensitive search across name/phone/email, RFC 4180 CSV quoting with doubled quotes + CRLF, form-encoded query-string round-trip — session-34, ADR-012) | Vitest |
 | E2E chrome contract | 1 | 7 | `tests/e2e/mobile-navigation.spec.ts` | Playwright |
 | E2E landing parity | 1 | 13 | `tests/e2e/landing.spec.ts` (incl. title + tel: pins, reduced-motion instant-jump pin, baseline security-header pin, SVG-favicon chrome pin) | Playwright |
 | E2E write path | 1 | 10 | `tests/e2e/appointment-form.spec.ts` (incl. 422 UI, 429, 413, impossible dates, non-object body, curated transport-failure message) | Playwright |
 | E2E legal pages | 1 | 3 | `tests/e2e/legal-pages.spec.ts` (incl. title pins) | Playwright |
 | E2E auth loop | 1 | 9 | `tests/e2e/auth.spec.ts` (incl. enumeration parity, cookie flags, non-object body, login-limiter 429 pin, login email-length bound pin) | Playwright |
 | E2E status management | 1 | 2 | `tests/e2e/appointments-status.spec.ts` (dashboard New→Confirmed→Completed UI loop + PATCH 401/422/404/200 pins) | Playwright |
+| E2E dashboard query layer | 1 | 8 | `tests/e2e/dashboard-filters.spec.ts` (anon export 401, derived select options, status filter + search + casefold pins, bogus-param dropping, the empty-filter state, export-respects-filter with RFC 4180 header/escaping pins — session-34, ADR-012) | Playwright |
 | E2E SEO surfaces | 1 | 9 | `tests/e2e/seo.spec.ts` (robots allow-all + absent Disallow, sitemap loc parity via the LL-11 host rewrite, canonical/OG/twitter head tags, og-image 1200×630 IHDR pin, staff noindex metas — session-32) | Playwright |
 
 ### 7.2 Test Patterns
@@ -743,16 +814,16 @@ end-to-end.
 ### 7.3 Coverage Thresholds
 
 No numeric threshold configured (content-rendering app; the meaningful
-coverage is the parity surface). The gate is pass/fail: 121/121 unit,
-53/53 e2e.
+coverage is the parity surface). The gate is pass/fail: 152/152 unit,
+61/61 e2e.
 
 ### 7.4 Pre-Push Checklist
 
 - [ ] `bun run lint` — 0 errors (strengthened ruleset: 14 correctness rules ON, documented offs only — session-12 F3 + session-16 F3)
 - [ ] `bun run typecheck` — clean (true strict)
-- [ ] `bun run test` — 121/121 (db-path 19 + auth 19 + deps 4 + validation 27 + rate-limit 20 + status 10 + seed-demo 8 + seo 14)
+- [ ] `bun run test` — 152/152 (db-path 19 + auth 19 + deps 4 + validation 27 + rate-limit 20 + status 10 + seed-demo 8 + seo 14 + dashboard-filters 31)
 - [ ] `bun run build` — standalone output produced (types enforced — no ignoreBuildErrors)
-- [ ] `bun run test:e2e` — 53/53 (requires the build)
+- [ ] `bun run test:e2e` — 61/61 (requires the build)
 - [ ] `git status` clean of secrets/artifacts before commit
 
 ---
@@ -855,6 +926,7 @@ bun run dev            # verify: curl localhost:3000/api/health
 | LOW | ~~No sitemap / robots.txt / canonical URLs / complete OG / twitter card (the reference has none either — verified 404s + JS-set title only)~~ | CLOSED in session 32: the full discoverability layer shipped as a head-only beyond-parity extension (ADR-011) — `sitemap.ts` + `robots.ts` + canonicals + complete OG (incl. generated `og-image.png`) + twitter card + the root `title.template`, all composed from the unit-tested `src/lib/seo.ts` seam and pinned by `tests/e2e/seo.spec.ts` (9 tests) | Closed (session-32) |
 | INFO | robots.txt is ALLOW-ALL (no Disallow entries — pinned by test) | deliberate: the staff pages' noindex METAS must stay crawler-visible (a robots.txt Disallow would hide them — Google's documented robots.txt × noindex interaction; blocked pages can still be indexed URL-only) | Documented (ADR-011, session-32) |
 | INFO | No JSON-LD structured data (MedicalClinic schema) | the site's NAP copy is verbatim-reference placeholder data (`info@mysite.com`, `123-456-7890`) — publishing schema would advertise fake phone/email | Deliberately skipped (session-32 §1.3) — revisit when real clinic data exists |
+| INFO | The dashboard query layer (ADR-012) filters within the latest-100 window, and the CSV export serves that same window | the fetch (and the export route's fetch) is capped at `take: 100` — a filtered view never surfaces rows outside the window; at clinic scale this is the documented semantic, not a defect | Documented (session-34, ADR-012) — a paginated query layer is the recorded future step if volumes outgrow it |
 
 ---
 
@@ -871,13 +943,17 @@ bun run dev            # verify: curl localhost:3000/api/health
 | `src/lib/auth.ts` | ~150 | scrypt + HMAC session primitives (unit-tested seam) |
 | `src/app/api/appointments/route.ts` | ~82 | Validation seam call, rate limiting, persistence |
 | `src/app/api/auth/login/route.ts` | ~130 | Credential verify, session cookie, login limiter |
-| `src/app/dashboard/page.tsx` | ~286 | Session-guarded stats + appointments table with status transitions (RSC) |
+| `src/app/dashboard/page.tsx` | ~470 | Session-guarded stats + query bar (native GET form — ADR-012) + appointments table with status transitions (RSC) |
 | `scripts/seed.ts` | ~96 | db:seed staff upsert + opt-in demo-row mode (session-28 F1) |
 | `src/lib/seed-demo.ts` | ~132 | Demo-row builder seam: 6 rows, 2/2/2 split, self-renewing dates (unit-tested) |
 | `tests/seed-demo.test.ts` | ~131 | The demo-seam unit contract (8 cases — session-28 F1) |
 | `src/lib/db-path.ts` | ~135 | Pure SQLite URL resolution (tested seam, incl. moduleSelfRoot decode) |
 | `src/lib/seo.ts` | ~130 | Metadata composition seam: brand, title template, OG image contract, PUBLIC_PATHS sitemap allowlist, pageMetadata factory (session-32, ADR-011) |
 | `src/app/sitemap.ts` + `src/app/robots.ts` | ~60 | The discoverability routes — sitemap from PUBLIC_PATHS (build-time lastModified), allow-all robots + sitemap ref (session-32, ADR-011) |
+| `src/lib/dashboard-filters.ts` | ~165 | The dashboard query seam: parse (derived allowlists) / AND filter (case-insensitive across name/phone/email) / RFC 4180 CSV / form-encoded query string (session-34, ADR-012) |
+| `src/app/api/appointments/export/route.ts` | ~95 | Session-guarded CSV export: PATCH-route guard doctrine + 60/10-min limiter + the same seam (session-34, ADR-012) |
+| `tests/dashboard-filters.test.ts` | ~255 | The query-seam unit contract (31 cases — session-34, ADR-012) |
+| `tests/e2e/dashboard-filters.spec.ts` | ~290 | The query-layer e2e: anon-401, derived selects, filter/search/casefold/bogus/empty pins, export-respects-filter + RFC 4180 escaping (session-34) |
 | `tests/e2e/seo.spec.ts` | ~150 | The served SEO contract: robots allow-all/no-Disallow, sitemap loc parity (LL-11 host rewrite), canonical/OG/twitter, og-image IHDR, staff noindex (session-32) |
 | `tests/e2e/mobile-navigation.spec.ts` | ~170 | Chrome contract + Tailwind v4 trap guards |
 | `tests/e2e/auth.spec.ts` | ~263 | Full auth loop incl. public-form→dashboard visibility + browser-login key injection |

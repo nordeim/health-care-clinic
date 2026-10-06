@@ -2,11 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { HeartPulse, CalendarDays, Phone, Mail } from "lucide-react";
+import { HeartPulse, CalendarDays, Phone, Mail, Download } from "lucide-react";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 import { upcomingVisitsFloor } from "@/lib/validation";
-import { appointmentStatuses } from "@/lib/content";
+import { appointmentStatuses, services } from "@/lib/content";
+import {
+  filterAppointments,
+  filtersAreEmpty,
+  filtersToQueryString,
+  parseDashboardFilters,
+} from "@/lib/dashboard-filters";
 import { LogoutButton } from "@/components/dashboard/logout-button";
 import { StatusButton } from "@/components/dashboard/status-button";
 
@@ -57,7 +63,17 @@ function statusLabel(value: string): string {
   );
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // The query layer (session-34, ADR-012): the SAME pure seam parses,
+  // filters, and exports for this page and the CSV route — the two
+  // surfaces cannot drift apart. A native GET form drives it: the
+  // controls are server-rendered and work without JavaScript.
+  const filters = parseDashboardFilters(await searchParams);
+
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   const session = token ? verifySession(token) : null;
@@ -115,6 +131,11 @@ export default async function DashboardPage() {
 
   const topSpecialty =
     topSpecialties.length > 0 ? topSpecialties[0].specialty : "—";
+
+  // Filters scope the TABLE (within the latest-100 window); the stats
+  // cards above stay global — they describe the whole inbox.
+  const visibleAppointments = filterAppointments(appointments, filters);
+  const filtersActive = !filtersAreEmpty(filters);
 
   const stats = [
     { label: "Total requests", value: total },
@@ -188,7 +209,102 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="-mx-2 overflow-x-auto px-2">
-              <table className="w-full min-w-[840px] border-collapse text-sm">
+              {/* The query bar (ADR-012): a native GET form — no client
+                 island, no hydration surface. The selects submit ""
+                 when unset, which parseDashboardFilters treats as
+                 absent; the export anchor carries the ACTIVE filters so
+                 the CSV always matches the visible view. */}
+              <form
+                action="/dashboard"
+                method="get"
+                className="flex flex-wrap items-end gap-3 pb-6"
+                aria-label="Filter appointment requests"
+              >
+                <label className="grid gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Status
+                  <select
+                    name="status"
+                    defaultValue={filters.status ?? ""}
+                    className="min-w-36 rounded-full border border-primary/20 bg-background px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground"
+                  >
+                    <option value="">All statuses</option>
+                    {appointmentStatuses.map((status) => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Specialty
+                  <select
+                    name="specialty"
+                    defaultValue={filters.specialty ?? ""}
+                    className="min-w-44 rounded-full border border-primary/20 bg-background px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground"
+                  >
+                    <option value="">All specialties</option>
+                    {services.map((service) => (
+                      <option key={service.title} value={service.title}>
+                        {service.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Search
+                  <input
+                    type="search"
+                    name="search"
+                    defaultValue={filters.search ?? ""}
+                    placeholder="Name, phone, or email"
+                    className="min-w-56 rounded-full border border-primary/20 bg-background px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground placeholder:text-muted-foreground/70"
+                  />
+                </label>
+                <div className="flex items-center gap-2 pb-0.5">
+                  <button
+                    type="submit"
+                    className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    Apply
+                  </button>
+                  {filtersActive ? (
+                    <Link
+                      href="/dashboard"
+                      className="rounded-full border border-primary/30 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+                    >
+                      Clear
+                    </Link>
+                  ) : null}
+                  {/* A plain anchor (not next/link): a file download, not
+                      an App-Router page. */}
+                  <a
+                    href={`/api/appointments/export${filtersToQueryString(filters)}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    Export CSV
+                  </a>
+                </div>
+              </form>
+              {visibleAppointments.length === 0 ? (
+                <div className="grid place-items-center gap-3 py-16 text-center">
+                  <CalendarDays
+                    className="h-8 w-8 text-muted-foreground/60"
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm font-medium text-primary">
+                    No requests match the current filters.
+                  </p>
+                  <Link
+                    href="/dashboard"
+                    className="text-sm font-medium text-primary underline underline-offset-4"
+                  >
+                    Clear filters
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <table className="w-full min-w-[840px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-primary/15 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <th scope="col" className="py-3 pr-4 font-medium">
@@ -212,7 +328,7 @@ export default async function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {appointments.map((appointment) => (
+                  {visibleAppointments.map((appointment) => (
                     <tr
                       key={appointment.id}
                       className="border-b border-primary/10 last:border-0"
@@ -276,9 +392,12 @@ export default async function DashboardPage() {
                 </tbody>
               </table>
               <p className="pt-4 text-xs text-muted-foreground">
-                Showing the {appointments.length.toLocaleString("en-US")} most
-                recent requests.
+                {filtersActive
+                  ? `${visibleAppointments.length.toLocaleString("en-US")} of ${appointments.length.toLocaleString("en-US")} requests match the current filters.`
+                  : `Showing the ${appointments.length.toLocaleString("en-US")} most recent requests.`}
               </p>
+                </>
+              )}
             </div>
           )}
         </section>

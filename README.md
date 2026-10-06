@@ -47,9 +47,9 @@ geometry).
 | ❓ FAQ accordion | Native `<details>`/`<summary>` with rotating plus glyphs |
 | ⚖️ Legal pages | `/privacy-policy` and `/accessibility-statement` with identical copy and layout |
 | 🔐 Staff sign-in | `/login` — scrypt password verify + HMAC-signed httpOnly session cookie (7 days), login-rate-limited |
-| 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + latest 100 requests with status transitions (New → Confirmed → Completed via `PATCH /api/appointments/[id]`), server-guarded |
+| 📊 Appointment dashboard | `/dashboard` — staff-only review surface: stats cards (total / new today / upcoming / top specialty) + a query bar (status filter, specialty filter, case-insensitive search — a native GET form, works without JS) + latest 100 requests with status transitions (New → Confirmed → Completed via `PATCH /api/appointments/[id]`) + a one-click CSV export that respects the active filters (`GET /api/appointments/export`, RFC 4180), server-guarded |
 | 🛡️ Abuse controls | Per-key fixed-window rate limiting (5 / 10 min on appointments, 10 / 10 min on login — keyed on the LAST `X-Forwarded-For` token so proxies make it trustworthy), a 64 KiB body cap (413) enforced while STREAM-READING (chunked bodies without content-length are capped identically), strict server-side payload validation, and baseline security headers on every route response and app-level redirect (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, no `X-Powered-By`; the framework's internal 308 trailing-slash redirect is emitted before `headers()` applies — a documented, e2e-pinned limitation) |
-| ✅ Tested | 121 unit tests + 53 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), the SEO surface pins (robots allow-all + no-Disallow, sitemap loc parity — every advertised loc fetches 200, canonical/OG/twitter head tags, og-image 1200×630 IHDR pin, the staff noindex metas), and the validation + timing-equalization + status + demo-seed + seo-composition seams |
+| ✅ Tested | 152 unit tests + 61 Playwright e2e tests, including Tailwind v4 trap guards, title- and favicon-deviation pins, a dependency-contract pin, the full auth loop, rate-limit/429/413 pins on BOTH routes (stream-read body cap incl. chunked transports + transport-error tolerance), non-object-body tolerance pins, reduced-motion scroll pins, the email length bound (both routes), the security-header contract (route responses AND app-level redirects, with the framework-308 limitation pinned), the curated transport-failure message, the dashboard status-transition loop (New → Confirmed → Completed), the dashboard query layer (derived-allowlist parsing, filter/search/casefold pins, bogus-param dropping, the empty-filter state, export-respects-filter + RFC 4180 escaping), the SEO surface pins (robots allow-all + no-Disallow, sitemap loc parity — every advertised loc fetches 200, canonical/OG/twitter head tags, og-image 1200×630 IHDR pin, the staff noindex metas), and the validation + timing-equalization + status + demo-seed + seo-composition + dashboard-filters seams |
 
 > The reference app itself has no login or dashboard (its complete route
 > table is `/`, `/privacy-policy`, `/accessibility-statement` — verified
@@ -99,7 +99,8 @@ flowchart TB
 │   ├── 📄 sitemap.ts              ← /sitemap.xml — the 3 public routes (PUBLIC_PATHS-derived)
 │   ├── 📄 robots.ts               ← /robots.txt — allow-all + sitemap reference (ADR-011)
 │   ├── 📄 page.tsx               ← Landing composition (8 scroll sections + fixed header + footer)
-│   ├── 📂 api/appointments/      ← POST — validated writes; [id]/ PATCH — staff status transitions
+│   ├── 📂 api/appointments/      ← POST — validated writes; [id]/ PATCH — staff status transitions;
+│   │                               export/ GET — session-guarded CSV (session-34, ADR-012)
 │   ├── 📂 api/auth/              ← POST login/logout — scrypt verify + session cookie
 │   ├── 📂 api/health/            ← GET — liveness + DB probe
 │   ├── 📂 login/                 ← Staff sign-in page (not linked from the landing page)
@@ -119,16 +120,19 @@ flowchart TB
     ├── 📄 db.ts                  ← Prisma singleton (env-resolved URL)
     ├── 📄 db-path.ts             ← SQLite path resolution (unit-tested)
     ├── 📄 seed-demo.ts            ← Demo dashboard rows (opt-in, unit-tested — session-28 F1)
-    └── 📄 seo.ts                  ← Metadata composition seam: brand, title template, OG image
+    ├── 📄 seo.ts                  ← Metadata composition seam: brand, title template, OG image
     │                                 contract, PUBLIC_PATHS allowlist, pageMetadata factory
     │                                 (unit-tested — session-32, ADR-011)
+    └── 📄 dashboard-filters.ts     ← The dashboard query seam: parse/filter/CSV/query-string
+                                      (unit-tested — session-34, ADR-012)
 📂 prisma/schema.prisma           ← Appointment + AdminUser models
 📂 scripts/seed.ts                ← db:seed — staff account upsert; SEED_DEMO=1/--demo restores the 6 demo rows (opt-in, idempotent)
 📂 tests/e2e/                     ← Playwright specs (mobile-navigation, landing,
 │                                   appointment-form, appointments-status, legal-pages, auth,
-│                                   seo — robots/sitemap/canonical/OG/og-image/noindex pins)
+│                                   seo — robots/sitemap/canonical/OG/og-image/noindex pins,
+│                                   dashboard-filters — query-bar + CSV-export pins)
 📂 tests/*.test.ts                ← Vitest seams (db-path, auth, deps, validation,
-│                                   rate-limit, status, seed-demo, seo)
+│                                   rate-limit, status, seed-demo, seo, dashboard-filters)
 📂 public/media/                  ← Hero video/poster, section photography
 📂 public/og-image.png            ← Generated 1200×630 social card (session-32)
 📂 docs/                          ← Validation report, screenshots, deployment
@@ -173,6 +177,7 @@ starting with `$` must be escaped as `\$`).
 | `/api/health` | GET | `200 {ok, database}` | 503 when the DB is unreachable |
 | `/api/auth/login` | POST | `{email, password}` → `200 {ok}` + httpOnly session cookie | 401 generic error (no user enumeration); 422 field map (email pattern + the shared 254-char bound); 429 rate-limited (10 / 10 min / IP) |
 | `/api/appointments/[id]` | PATCH | `{status}` → `200 {ok, id, status}` (staff session required) | 401 anonymous; 422 field map (status allowlist: new/confirmed/completed); 404 unknown id; 413 over 64 KiB; 429 rate-limited (60 / 10 min / IP) |
+| `/api/appointments/export` | GET | `text/csv` attachment (staff session required) — RFC 4180 rows respecting the ACTIVE dashboard filters (`?status=&specialty=&search=`) | 401 anonymous (before any DB read); 429 rate-limited (60 / 10 min / IP); ISO 8601 dates + raw status values; filename `appointments-<date>.csv` |
 | `/api/auth/logout` | POST | → `200 {ok}` | Clears the session cookie; idempotent |
 
 ## Environment Variables
@@ -197,7 +202,7 @@ The `dev` / `build` / `db:*` scripts strip any ambient `DATABASE_URL`
 ```bash
 bun run lint          # ESLint (flat config) — 14 correctness rules ON, every deliberate off documented
 bun run typecheck     # tsc --noEmit (true strict)
-bun run test          # Vitest unit layer (db-path + auth + deps + validation + rate-limit + status seams)
+bun run test          # Vitest unit layer (db-path + auth + deps + validation + rate-limit + status + seed-demo + seo + dashboard-filters seams)
 bun run build         # production standalone build (types enforced)
 bun run test:e2e      # Playwright — boots the standalone server + scratch DB
 ```
@@ -209,7 +214,11 @@ theme regression would collapse them to transparent). The
 `seo` spec pins the discoverability surfaces (robots allow-all + the
 absent Disallow, sitemap loc parity — every advertised `<loc>` fetches
 200 after the LL-11 host rewrite, canonical/OG/twitter head tags, the
-og-image 1200×630 IHDR dimensions, and the staff noindex metas).
+og-image 1200×630 IHDR dimensions, and the staff noindex metas). The
+`dashboard-filters` spec pins the query layer (the derived select
+options, filter/search/case-insensitivity, bogus-param dropping, the
+empty-filter state, and the CSV export — filter-respecting, RFC 4180
+quoting, session-guarded).
 
 ## Design System
 

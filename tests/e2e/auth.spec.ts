@@ -130,7 +130,14 @@ test.describe("staff authentication", () => {
     ).toBeVisible();
     await expect(page.getByText(callerName)).toBeVisible();
     await expect(page.getByText(callerEmail)).toBeVisible();
-    await expect(page.getByText("Women's health").first()).toBeVisible();
+    // Scoped to the caller's TABLE ROW since session-34: the ADR-012 query
+    // bar's specialty <select> also contains the text "Women's health" as
+    // a (hidden) <option>, so a page-wide .first() locator would resolve
+    // to the dropdown option instead of the table cell. Row-scoping makes
+    // the original intent — the submitted row's specialty renders —
+    // unambiguous.
+    const callerRow = page.getByRole("row", { name: new RegExp(callerName) });
+    await expect(callerRow.getByText("Women's health")).toBeVisible();
 
     // The session cookie is present and carries the documented flags:
     // httpOnly + SameSite=Lax always; Secure when NODE_ENV=production —

@@ -17,7 +17,7 @@ the log tails, never by the wrapper's exit status.
 | Lint | `bun run lint` (14 correctness rules ON; every off documented in the config — session-12 F3, session-16 F3) |
 | Typecheck | `bun run typecheck` |
 | Unit tests | `bun run test` (Vitest, `*.test.ts` only) |
-| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 53 tests) |
+| E2E tests | `bun run build && bun run test:e2e` (Playwright; boots the standalone server on :3100 with its own scratch DB; 61 tests) |
 | DB schema | `bun run db:push` (Prisma; SQLite at `db/custom.db`) |
 | Seed staff login | `bun run db:seed` (ADMIN_EMAIL/ADMIN_PASSWORD from `.env`) — add `SEED_DEMO=1` (or `-- --demo`) to ALSO restore the 6 demo dashboard rows (opt-in, idempotent, dev-only; default seeding never creates patient rows — session-28 F1) |
 | Production | `bun run build && bun .next/standalone/server.js` |
@@ -40,8 +40,10 @@ create a divergent one.
 Pixel-faithful clone of `https://health-care-clinic.base44.app/` (a
 Tailwind-v3 Vite SPA) rebuilt on **Next.js 16 App Router + Tailwind CSS
 v4 + Prisma/SQLite**. Landing page + two legal pages + one public write
-path (`POST /api/appointments`) plus the staff write paths (`PATCH
-/api/appointments/[id]`, `POST /api/auth/login`, `POST /api/auth/logout`).
+path (`POST /api/appointments`) plus the staff surfaces (`PATCH
+/api/appointments/[id]` status transitions, `POST /api/auth/login`,
+`POST /api/auth/logout`, and the filter/search/CSV-export query layer
+over the latest-100 window — `src/lib/dashboard-filters.ts`, ADR-012).
 The reference itself has NO login or dashboard
 (its route table is `/`, `/privacy-policy`, `/accessibility-statement`);
 the staff `/login` + `/dashboard` pair is a documented extension beyond
@@ -133,7 +135,12 @@ inline in components.
     crawler-visible — a robots.txt Disallow would hide them); the spec
     pins the absent Disallow. Page titles are composed by the root
     `title.template` — sub-pages pass BARE titles (a hand-written suffix
-    would double).
+    would double). NOTE (session-34 A4): the spec's `BAKED_ORIGIN`
+    constant is coupled to the repo-`.env` build default — running e2e
+    against a production-baked artifact requires deriving it from the
+    build env first. The `noindex` staff pages inherit the root OG AND
+    the root canonical (bare origin) via metadata merging — inert under
+    noindex, recorded in ADR-011's Consequences.
 
 ## Conventions
 
@@ -179,6 +186,11 @@ inline in components.
 
 ## Testing quirks
 
+- **Count e2e tests at RUNTIME, not by declaration (session-34 A3):**
+  `tests/e2e/seo.spec.ts` declares 7 `test()` blocks but executes 9 —
+  the data-driven loops at :109 (legal pages ×2) and :151 (staff
+  noindex ×2) expand per iteration. The suite is 61 tests at runtime;
+  a declaration-only grep would undercount by 2.
 - Playwright's `globalSetup` pushes the schema to `db/e2e.db` and seeds the
   e2e staff account (E2E_ADMIN_EMAIL/PASSWORD exported from global-setup.ts);
   specs run single-worker (shared SQLite file). `test:e2e` requires a prior

@@ -69,7 +69,10 @@ reference has no login — its route table is `/`, `/privacy-policy`,
   (reduced-motion scroll behavior), `db.ts`, `db-path.ts`, `seed-demo.ts`
   (opt-in demo-row builder, session-28 F1), `seo.ts` (metadata composition
   seam — brand, title template, OG image contract, PUBLIC_PATHS sitemap
-  allowlist, pageMetadata factory; session-32 ADR-011)
+  allowlist, pageMetadata factory; session-32 ADR-011),
+  `dashboard-filters.ts` (the dashboard query seam — derived-allowlist
+  parsing, AND filtering with case-insensitive search, RFC 4180 CSV,
+  form-encoded query string; session-34 ADR-012)
 - `prisma/` — schema (Appointment + AdminUser models)
 - `scripts/seed.ts` — `db:seed` staff account upsert (+ opt-in
   `SEED_DEMO=1`/`--demo` mode restoring the 6 demo dashboard rows)
@@ -101,6 +104,12 @@ reference has no login — its route table is `/`, `/privacy-policy`,
 - `PATCH /api/appointments/[id]` — the dashboard's status-transition write
   path (session-guarded; status allowlist derived from content.ts; limiter
   60 / 10 min / IP; 64 KiB body cap; 404 unknown ids).
+- `GET /api/appointments/export` — the dashboard's CSV export (ADR-012;
+  session-guarded with the PATCH route's doctrine — 401 before any DB
+  read; limiter 60 / 10 min / IP; the SAME query seam the dashboard
+  page uses, so the export always matches the visible view; RFC 4180
+  rows, ISO 8601 dates, raw status values; attachment filename with a
+  request-time date prefix).
 - `GET /api/health` — `SELECT 1` probe; 503 when down.
 
 ## Development Workflow
@@ -158,8 +167,14 @@ non-obvious-rules list; this file holds the reasoning.
   composition seam (`tests/seo.test.ts`, 14 cases: the brand/template
   constants, the ≤160-char SERP description bound, the PUBLIC_PATHS
   allowlist (never the noindex routes), canonical/OG/twitter composition,
-  the OG image dimension contract, the bare-title rule — session-32).
-- **E2E (Playwright):** seven spec files — `mobile-navigation` (the
+  the OG image dimension contract, the bare-title rule — session-32),
+  and the dashboard query seam (`tests/dashboard-filters.test.ts`, 31
+  cases: derived-allowlist parsing incl. empty GET-form controls and
+  array shapes, AND filtering with case-insensitive search across
+  name/phone/email, RFC 4180 CSV quoting with doubled embedded quotes +
+  CRLF rows + null-field handling, the form-encoded query-string
+  round-trip — session-34, ADR-012).
+- **E2E (Playwright):** eight spec files — `mobile-navigation` (the
   user-facing chrome contract + Tailwind v4 trap guards), `landing`
   (section content, anchors, FAQ, CTA scroll, tel: uniformity,
   reduced-motion instant-jump pin, baseline security-header pin, the
@@ -174,7 +189,11 @@ non-obvious-rules list; this file holds the reasoning.
   allow-all + the absent Disallow, sitemap loc parity — every advertised
   loc fetches 200 after the LL-11 host rewrite, canonical/OG/twitter head
   tags on the public pages, the og-image 1200×630 IHDR pin, the staff
-  noindex metas — session-32). Single
+  noindex metas — session-32), and `dashboard-filters` (the ADR-012
+  query layer: anonymous export 401, the derived select options,
+  status-filter/search/case-insensitivity pins, bogus-param dropping,
+  the empty-filter state, and the CSV export — filter-respecting,
+  RFC 4180 quoting, session-guarded — session-34). Single
   worker, shared scratch DB (`db/e2e.db`), standalone server on :3100;
   EVERY request-level spec derives its spoofed XFF key per run
   (module constants with spec-unique third octets), AND every
@@ -265,13 +284,16 @@ reference copy today). Do not inline copy edits into components.
 
 - Verification gate green (lint 0 under the strengthened ruleset — 14
   correctness rules ON, documented offs only — tsc 0 under true strict,
-  121/121 unit, build OK, 53/53 e2e).
+  152/152 unit, build OK, 61/61 e2e).
 - Parity spot-checks: page height 7490px; services h2 60px/63px lh; h3
   20px/25px; about rows 40px; mobile menu panel 192×148, bg rgb(38 74 57
   / 0.9).
 - Auth loop: public form submit → 201 → row visible on the authenticated
   dashboard; wrong credentials → generic 401; anonymous `/dashboard` →
   307 to `/login`.
+- Query layer: filter/search on `/dashboard` narrows the table via the
+  seam; the CSV export mirrors the visible view (session-guarded, RFC
+  4180).
 
 ## System Integration
 
